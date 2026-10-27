@@ -358,3 +358,7 @@ select, input.search, .filters input {
   .deck-grid { grid-template-columns: repeat(10, 1fr); }
   .editor-search { flex: 1 1 40%; height: calc(100dvh - 60px); }
 }
+
+/* Les boutons de validation restent visibles même quand la liste défile. */
+.sheet .sheet-actions { position: sticky; bottom: calc(-1 * (var(--safe-bottom) + 14px)); background: var(--panel-solid); padding: 10px 0 calc(var(--safe-bottom) + 4px); margin-bottom: calc(-1 * var(--safe-bottom)); }
+.sheet .pick-grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
