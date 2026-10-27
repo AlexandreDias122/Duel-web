@@ -89,6 +89,37 @@ export function validateDeck(db: CardDb, deck: Pick<Deck, "main" | "extra" | "si
   return errors;
 }
 
+/** Cartes génériques pour combler les places libérées par la banlist (decks de démarrage). */
+const STAPLES = [14558127, 10045474, 97268402, 59438930, 73642296, 24299458, 8267140, 5318639, 14087893, 54693926];
+
+/**
+ * Rend un deck conforme à la banlist : retire les cartes interdites ou en trop
+ * et comble le Main Deck avec des cartes génériques autorisées.
+ */
+export function adaptToBanlist(db: CardDb, deck: { main: number[]; extra: number[] }, banlist: Banlist | null) {
+  const counts = new Map<number, number>();
+  const removed: string[] = [];
+  const keep = (id: number) => {
+    const base = db.baseId(id);
+    const n = counts.get(base) ?? 0;
+    if (n >= limitOf(db, id, banlist)) {
+      removed.push(db.get(id)?.name ?? String(id));
+      return false;
+    }
+    counts.set(base, n + 1);
+    return true;
+  };
+  const main = deck.main.filter(keep);
+  const extra = deck.extra.filter(keep);
+  for (const id of STAPLES) {
+    while (main.length < deck.main.length && (counts.get(id) ?? 0) < Math.min(3, limitOf(db, id, banlist))) {
+      main.push(id);
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+  }
+  return { main, extra, removed };
+}
+
 const KEY = "ygo-web.decks";
 
 export function loadDecks(): Deck[] {

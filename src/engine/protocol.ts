@@ -51,6 +51,8 @@ export interface DuelState {
   turnPlayer: number;
   phase: number;
   chain: ChainLink[];
+  /** Numéro du maillon en cours de résolution (0 si aucun). */
+  solving: number;
 }
 
 export interface StartOptions {
@@ -63,8 +65,14 @@ export interface StartOptions {
 }
 
 export type ToWorker =
-  | { kind: "start"; options: StartOptions }
-  | { kind: "respond"; response: OcgResponse };
+  | { kind: "warmup"; base: string }
+  | { kind: "start"; duel: number; options: StartOptions }
+  | { kind: "respond"; duel: number; response: OcgResponse }
+  /** Temps écoulé : le moteur répond à la place du joueur. */
+  | { kind: "timeout"; duel: number };
+
+/** Message du worker, rattaché au duel qui l'a produit. */
+export type FromWorkerTagged = FromWorker & { duel: number };
 
 export type FromWorker =
   | { kind: "loading"; text: string }

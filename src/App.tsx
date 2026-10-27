@@ -11,6 +11,7 @@ import { DuelScreen } from "./screens/DuelScreen";
 import { DuelSetup } from "./screens/DuelSetup";
 import type { DuelConfig } from "./screens/DuelSetup";
 import type { DuelMode } from "./engine/controller";
+import { warmupEngine } from "./engine/controller";
 
 type Route =
   | { name: "home" }
@@ -33,7 +34,10 @@ export default function App() {
       fetch(new URL("data/banlists.json", BASE)).then((r) => r.json()),
       fetch(new URL("data/decks/starter.json", BASE)).then((r) => r.json()),
     ])
-      .then(([db, banlists, starters]) => setData({ db, banlists, starters }))
+      .then(([db, banlists, starters]) => {
+        setData({ db, banlists, starters });
+        warmupEngine();
+      })
       .catch((e) => setError(String(e)));
   }, []);
 

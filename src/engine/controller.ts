@@ -4,7 +4,7 @@ import { OcgMessageType as T } from "ocgcore-wasm";
 import type { OcgMessage, OcgResponse } from "ocgcore-wasm";
 import type { CardDb } from "../lib/cards";
 import { LOC, PHASE_NAMES } from "../lib/constants";
-import type { DeckList, DuelState, FromWorker, ToWorker } from "./protocol";
+import type { DeckList, DuelState, FromWorker, FromWorkerTagged, ToWorker } from "./protocol";
 
 export interface Prompt {
   id: number;
@@ -28,27 +28,50 @@ export interface DuelView {
   flash: Flash | null;
   end: { winner: number; reason: string } | null;
   error: string | null;
+  /** Temps restant ce tour (secondes), null sans minuteur. */
+  clock: number | null;
+}
+
+// Un seul worker pour toute la session : le moteur et les cartes restent chargés entre deux duels.
+let sharedWorker: Worker | null = null;
+let duelCounter = 0;
+const handlers = new Map<number, (m: FromWorker) => void>();
+
+function worker(): Worker {
+  if (!sharedWorker) {
+    sharedWorker = new Worker(new URL("./duel.worker.ts", import.meta.url), { type: "module" });
+    sharedWorker.onmessage = (e: MessageEvent<FromWorkerTagged>) => handlers.get(e.data.duel)?.(e.data);
+    sharedWorker.onerror = (e) => handlers.forEach((h) => h({ kind: "error", error: e.message || "Erreur du moteur" }));
+  }
+  return sharedWorker;
+}
+
+/** Démarre le moteur en arrière-plan dès l'accueil, pour que le premier duel se lance vite. */
+export function warmupEngine() {
+  worker().postMessage({ kind: "warmup", base: new URL(import.meta.env.BASE_URL, location.href).href } satisfies ToWorker);
 }
 
 export type DuelMode = "ai" | "solo";
 
 export class DuelController {
-  private worker: Worker;
+  private id = ++duelCounter;
+  private clockTimer: ReturnType<typeof setInterval> | null = null;
+  private clockTurn = -1;
   private listeners = new Set<() => void>();
   private queue: FromWorker[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
   private flashId = 0;
   private promptId = 0;
-  view: DuelView = { loading: "Démarrage du moteur…", state: null, prompt: null, log: [], flash: null, end: null, error: null };
+  view: DuelView = { loading: "Démarrage du moteur…", state: null, prompt: null, log: [], flash: null, end: null, error: null, clock: null };
 
-  constructor(private db: CardDb, readonly mode: DuelMode, decks: [DeckList, DeckList], readonly human: number) {
-    this.worker = new Worker(new URL("./duel.worker.ts", import.meta.url), { type: "module" });
-    this.worker.onmessage = (e: MessageEvent<FromWorker>) => this.receive(e.data);
-    this.worker.onerror = (e) => this.set({ error: e.message || "Erreur du moteur" });
+  /** turnSeconds : temps de réflexion par tour (0 = illimité). */
+  constructor(private db: CardDb, readonly mode: DuelMode, decks: [DeckList, DeckList], readonly human: number, private turnSeconds = 0) {
+    handlers.set(this.id, (m) => this.receive(m));
     const rand = () => String(Math.floor(Math.random() * 2 ** 31) + 1);
     const ai: [boolean, boolean] = mode === "ai" ? [human !== 0, human !== 1] : [false, false];
     this.send({
       kind: "start",
+      duel: this.id,
       options: {
         base: new URL(import.meta.env.BASE_URL, location.href).href,
         decks, ai, lp: 8000,
@@ -65,17 +88,47 @@ export class DuelController {
   getView = () => this.view;
 
   respond(response: OcgResponse) {
+    this.stopClock();
     this.set({ prompt: null });
-    this.send({ kind: "respond", response });
+    this.send({ kind: "respond", duel: this.id, response });
   }
 
   dispose() {
     if (this.timer) clearTimeout(this.timer);
-    this.worker.terminate();
+    this.stopClock();
+    handlers.delete(this.id);
   }
 
   private send(m: ToWorker) {
-    this.worker.postMessage(m);
+    worker().postMessage(m);
+  }
+
+  /** Le minuteur ne tourne que pendant que le joueur doit décider ; il repart à chaque tour. */
+  private startClock() {
+    if (!this.turnSeconds || !this.view.state) return;
+    if (this.clockTurn !== this.view.state.turn) {
+      this.clockTurn = this.view.state.turn;
+      this.set({ clock: this.turnSeconds });
+    }
+    if ((this.view.clock ?? 0) <= 0) return this.expire();
+    this.stopClock();
+    this.clockTimer = setInterval(() => {
+      const left = (this.view.clock ?? 0) - 1;
+      this.set({ clock: Math.max(0, left) });
+      if (left <= 0) this.expire();
+    }, 1000);
+  }
+
+  private stopClock() {
+    if (this.clockTimer) clearInterval(this.clockTimer);
+    this.clockTimer = null;
+  }
+
+  private expire() {
+    this.stopClock();
+    if (!this.view.prompt) return;
+    this.set({ prompt: null });
+    this.send({ kind: "timeout", duel: this.id });
   }
 
   private set(patch: Partial<DuelView>) {
@@ -113,7 +166,9 @@ export class DuelController {
         }
       } else if (m.kind === "prompt") {
         this.set({ prompt: { id: ++this.promptId, message: m.message, hint: m.hint, retry: m.retry } });
+        this.startClock();
       } else if (m.kind === "end") {
+        this.stopClock();
         this.set({ end: { winner: m.winner, reason: m.reason }, prompt: null });
       }
     }
@@ -167,9 +222,9 @@ export class DuelController {
 
 function pauseFor(msg: OcgMessage): number {
   switch (msg.type) {
-    case T.CHAINING: case T.SUMMONING: case T.SPSUMMONING: case T.FLIPSUMMONING: return 650;
-    case T.ATTACK: case T.DAMAGE: case T.CHAIN_SOLVED: return 450;
-    case T.MOVE: case T.SET: case T.POS_CHANGE: case T.NEW_PHASE: return 250;
+    case T.CHAINING: case T.SUMMONING: case T.SPSUMMONING: case T.FLIPSUMMONING: return 500;
+    case T.ATTACK: case T.DAMAGE: case T.CHAIN_SOLVED: return 300;
+    case T.MOVE: case T.SET: case T.POS_CHANGE: return 140;
     default: return 0;
   }
 }

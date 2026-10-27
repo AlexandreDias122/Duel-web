@@ -20,19 +20,23 @@ interface Props {
   /** Joueur humain (en mode IA), 0 s'il commence. */
   human: number;
   names: [string, string];
+  turnSeconds: number;
   onExit: () => void;
   onRematch: () => void;
 }
 
 type Inspect = { code: number; actions: CardAction[] } | null;
+/** Menu d'actions rapide façon Master Duel, ouvert en touchant une carte jouable. */
+type Menu = { key: string; code: number; actions: CardAction[] } | null;
 type PileView = { player: number; location: number } | null;
 
-export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Props) {
+export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onRematch }: Props) {
   const db = useDb();
-  const controller = useMemo(() => new DuelController(db, mode, decks, human), [db, mode, decks, human]);
+  const controller = useMemo(() => new DuelController(db, mode, decks, human, turnSeconds), [db, mode, decks, human, turnSeconds]);
   useEffect(() => () => controller.dispose(), [controller]);
   const view = useSyncExternalStore(controller.subscribe, controller.getView);
   const [inspect, setInspect] = useState<Inspect>(null);
+  const [menu, setMenu] = useState<Menu>(null);
   const [pile, setPile] = useState<PileView>(null);
   const [showLog, setShowLog] = useState(false);
   const [chosenZones, setChosenZones] = useState<string[]>([]);
@@ -41,6 +45,7 @@ export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Pro
 
   const respond = (r: OcgResponse) => {
     setInspect(null);
+    setMenu(null);
     setPile(null);
     setChosenZones([]);
     controller.respond(r);
@@ -94,8 +99,13 @@ export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Pro
   const label = (p: number) => (mode === "ai" ? (p === human ? names[0] : names[1]) : names[p]);
 
   const onCard = (controller: number, location: number, sequence: number, card: FieldCard) => {
-    const list = actions.get(cardKey(controller, location, sequence)) ?? [];
-    if (card.code || list.length) setInspect({ code: card.code, actions: list });
+    const key = cardKey(controller, location, sequence);
+    const list = actions.get(key) ?? [];
+    if (list.length) setMenu(menu?.key === key ? null : { key, code: card.code, actions: list });
+    else if (card.code) {
+      setMenu(null);
+      setInspect({ code: card.code, actions: [] });
+    }
   };
   const onZone = (player: number, location: number, sequence: number) => {
     if (!msg || (msg.type !== T.SELECT_PLACE && msg.type !== T.SELECT_DISFIELD)) return;
@@ -128,7 +138,7 @@ export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Pro
           const key = cardKey(player, LOC.HAND, i);
           const act = actions.has(key);
           return (
-            <div key={i} className={`hand-card ${act ? "zone-actionable" : ""} ${targets.has(key) ? "zone-target" : ""}`}
+            <div key={i} className={`hand-card ${act ? "zone-actionable" : ""} ${targets.has(key) ? "zone-target" : ""} ${menu?.key === key ? "menu-open" : ""}`}
               onClick={() => visible || c.isPublic ? onCard(player, LOC.HAND, i, c) : undefined}>
               <CardImage code={c.code} back={!visible && !c.isPublic} />
             </div>
@@ -175,10 +185,13 @@ export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Pro
         />
         {state.chain.length > 0 && (
           <div className="chain">
+            <div className="chain-title">Chaîne</div>
             {state.chain.map((c, i) => (
-              <div key={i} className="chain-link" onClick={() => setInspect({ code: c.code, actions: [] })}>
+              <div key={i}
+                className={`chain-link ${c.controller === viewer ? "mine" : "theirs"} ${state.solving === i + 1 ? "solving" : ""} ${state.solving && state.solving < i + 1 ? "done" : ""}`}
+                onClick={() => setInspect({ code: c.code, actions: [] })}>
                 <CardImage code={c.code} />
-                <span>{i + 1}</span>
+                <span className="chain-num">{i + 1}</span>
               </div>
             ))}
           </div>
@@ -202,6 +215,35 @@ export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Pro
         buttons={phaseButtons}
         onPick={(r) => respond(r)}
       />
+
+      {view.clock !== null && prompt && (
+        <div className={`clock ${view.clock <= 30 ? "low" : ""}`}>⏱ {Math.floor(view.clock / 60)}:{String(view.clock % 60).padStart(2, "0")}</div>
+      )}
+
+      {menu && actions.get(menu.key) && (
+        <div className="menu-backdrop" onClick={() => setMenu(null)}>
+          <div className="action-menu" onClick={(e) => e.stopPropagation()}>
+            {menu.code > 0 && (
+              <button className="action-card" onClick={() => { setInspect({ code: menu.code, actions: [] }); }} title="Voir la carte">
+                <CardImage code={menu.code} />
+                <span>ⓘ</span>
+              </button>
+            )}
+            <div className="action-buttons">
+              {menu.actions.map((a, i) => (
+                <button key={i} className={`action-btn act-${actionKind(a.label)}`} onClick={() => respond(a.response)}>
+                  <span className="action-icon">{ACTION_ICONS[actionKind(a.label)]}</span>
+                  <span className="action-label">{a.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {msg?.type === T.SELECT_IDLECMD && !menu && !inspect && state.turn <= 4 && (
+        <div className="turn-hint">À vous ! Touchez une carte qui brille pour jouer, ou le bouton de phase pour continuer.</div>
+      )}
 
       {prompt && msg && msg.type !== T.SELECT_IDLECMD && msg.type !== T.SELECT_BATTLECMD && (
         <PromptPanel
@@ -273,6 +315,20 @@ export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Pro
       )}
     </div>
   );
+}
+
+const ACTION_ICONS: Record<string, string> = {
+  summon: "⬆", special: "✦", set: "▼", activate: "⚡", position: "⟳", attack: "⚔", other: "•",
+};
+
+function actionKind(label: string): string {
+  if (label.startsWith("Invocation Normale")) return "summon";
+  if (label.startsWith("Invocation Spéciale")) return "special";
+  if (label.startsWith("Poser")) return "set";
+  if (label.startsWith("Activer")) return "activate";
+  if (label.startsWith("Changer")) return "position";
+  if (label.startsWith("Attaquer")) return "attack";
+  return "other";
 }
 
 function LpPlate({ name, lp, active, side }: { name: string; lp: number; active: boolean; side: "me" | "op" }) {

@@ -3,13 +3,28 @@
 import createCore from "ocgcore-wasm";
 import wasmUrl from "ocgcore-wasm/lib/ocgcore.sync.wasm?url";
 import { loadCardDb } from "../lib/cards";
+import type { CardDb } from "../lib/cards";
+import type { OcgCoreSync } from "ocgcore-wasm";
 import { DuelEngine } from "./duel";
 import type { FromWorker, ToWorker } from "./protocol";
 
-const post = (m: FromWorker) => self.postMessage(m);
 const scripts = new Map<string, string | null>();
 let base = "";
 let engine: DuelEngine | null = null;
+let current = 0;
+const post = (m: FromWorker) => self.postMessage({ ...m, duel: current });
+
+// Le worker reste ouvert d'un duel à l'autre : cartes, moteur et scripts ne sont chargés qu'une fois.
+let ready: Promise<[CardDb, string[], OcgCoreSync]> | null = null;
+function load(): Promise<[CardDb, string[], OcgCoreSync]> {
+  ready ??= Promise.all([
+    loadCardDb(base),
+    fetch(new URL("data/base-scripts.json", base)).then((r) => r.json() as Promise<string[]>),
+    createCore({ sync: true, locateFile: () => wasmUrl }),
+  ]);
+  ready.catch(() => (ready = null));
+  return ready;
+}
 
 function scriptUrl(name: string) {
   return new URL(`scripts/${name.split("/").pop()}`, base).href;
@@ -49,19 +64,23 @@ async function preload(names: string[]) {
 self.onmessage = async (e: MessageEvent<ToWorker>) => {
   const msg = e.data;
   try {
-    if (msg.kind === "start") {
+    if (msg.kind === "warmup") {
+      base = msg.base;
+      const [, baseScripts] = await load();
+      await preload(baseScripts);
+    } else if (msg.kind === "start") {
       const o = msg.options;
       base = o.base;
+      engine?.destroy();
+      engine = null;
+      current = msg.duel;
       post({ kind: "loading", text: "Chargement des cartes…" });
-      const [db, baseScripts, core] = await Promise.all([
-        loadCardDb(base),
-        fetch(new URL("data/base-scripts.json", base)).then((r) => r.json() as Promise<string[]>),
-        createCore({ sync: true, locateFile: () => wasmUrl }),
-      ]);
+      const [db, baseScripts, core] = await load();
+      if (current !== msg.duel) return;
       post({ kind: "loading", text: "Chargement des scripts…" });
       const codes = [...o.decks[0].main, ...o.decks[0].extra, ...o.decks[1].main, ...o.decks[1].extra];
       await preload([...baseScripts, ...codes.map((c) => `c${c}.lua`)]);
-      engine?.destroy();
+      if (current !== msg.duel) return;
       engine = new DuelEngine(core, db, {
         decks: o.decks,
         ai: o.ai,
@@ -72,7 +91,9 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       }, post);
       engine.run();
     } else if (msg.kind === "respond") {
-      engine?.respond(msg.response);
+      if (msg.duel === current) engine?.respond(msg.response);
+    } else if (msg.kind === "timeout") {
+      if (msg.duel === current) engine?.timeout();
     }
   } catch (err) {
     console.error(err);

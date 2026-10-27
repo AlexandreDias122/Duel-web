@@ -1,6 +1,6 @@
 // Pilotage d'un duel ygopro-core : boucle de traitement, état du terrain, IA.
-import { OcgCoreInternal, OcgDuelMode, OcgMessageType as T, OcgProcessResult } from "ocgcore-wasm";
-import type { OcgCoreSync, OcgDuelHandle, OcgMessage, OcgResponse } from "ocgcore-wasm";
+import { OcgCoreInternal, OcgDuelMode, OcgMessageType as T, OcgProcessResult, OcgResponseType } from "ocgcore-wasm";
+import type { OcgCoreSync, OcgDuelHandle, OcgLocation, OcgMessage, OcgResponse } from "ocgcore-wasm";
 import type { CardDb } from "../lib/cards";
 import { LOC, POS } from "../lib/constants";
 import { BasicAi, PROMPT_TYPES } from "./ai";
@@ -19,6 +19,57 @@ export interface DuelSetup {
 const QUERY_FLAGS =
   0x1 | 0x2 | 0x8 | 0x10 | 0x20 | 0x100 | 0x200 | 0x400 | 0x800 | 0x10000 | 0x20000 | 0x100000 | 0x200000 | 0x400000 | 0x800000;
 
+function seededRandom(seed: readonly bigint[]): () => number {
+  let a = Number(seed[0] & 0xffffffffn) | 1, b = Number(seed[1] & 0xffffffffn), c = Number(seed[2] & 0xffffffffn), d = Number(seed[3] & 0xffffffffn);
+  // sfc32, avec quelques tours à vide pour bien mélanger les petites graines
+  const next = () => {
+    a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+    const t = (a + b) | 0;
+    a = b ^ (b >>> 9);
+    b = (c + (c << 3)) | 0;
+    c = (c << 21) | (c >>> 11);
+    d = (d + 1) | 0;
+    const r = (t + d) | 0;
+    c = (c + r) | 0;
+    return (r >>> 0) / 4294967296;
+  };
+  for (let i = 0; i < 20; i++) next();
+  return next;
+}
+
+function shuffle<T>(list: readonly T[], rng: () => number): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * Questions qui n'appellent pas de vraie décision du joueur, comme dans Master Duel :
+ * fenêtre de chaîne sans carte activable, et placement simple dans ses propres zones.
+ */
+function autoResponse(prompt: OcgMessage): OcgResponse | null {
+  if (prompt.type === T.SELECT_CHAIN && prompt.selects.length === 0) return { type: OcgResponseType.SELECT_CHAIN, index: null };
+  if (prompt.type === T.SELECT_PLACE && prompt.count === 1) {
+    const free: number[] = [];
+    for (let bit = 0; bit < 32; bit++) if (bit % 16 !== 7 && !(prompt.field_mask & (1 << bit))) free.push(bit);
+    // Zones Monstre Extra ou terrain adverse : le choix compte, on laisse le joueur décider.
+    if (!free.length || free.some((b) => b >= 16 || b === 5 || b === 6 || b === 13)) return null;
+    const monster = free.every((b) => b < 8);
+    const spell = free.every((b) => b >= 8 && b <= 12);
+    if (!monster && !spell) return null;
+    // Zone la plus centrale disponible
+    const bit = [...free].sort((a, b) => Math.abs((a % 8) - 2) - Math.abs((b % 8) - 2))[0];
+    return {
+      type: OcgResponseType.SELECT_PLACE,
+      places: [{ player: prompt.player, location: (bit < 8 ? LOC.MZONE : LOC.SZONE) as OcgLocation, sequence: bit % 8 }],
+    };
+  }
+  return null;
+}
+
 export class DuelEngine {
   private duel: OcgDuelHandle;
   private ai: BasicAi;
@@ -29,6 +80,8 @@ export class DuelEngine {
   private hint: [bigint, bigint] = [0n, 0n];
   private pending: OcgMessage | null = null;
   private finished = false;
+  /** Maillon en cours de résolution (0 si aucun). */
+  private solving = 0;
 
   constructor(private core: OcgCoreSync, private db: CardDb, private setup: DuelSetup, private emit: (m: FromWorker) => void) {
     this.ai = new BasicAi(db);
@@ -58,8 +111,10 @@ export class DuelEngine {
       const content = setup.readScript(name);
       if (content) core.loadScript(duel, name, content);
     }
+    // Le moteur ne mélange pas lui-même le deck : on le mélange avant de poser les cartes.
+    const rng = seededRandom(setup.seed);
     setup.decks.forEach((deck, team) => {
-      for (const code of deck.main)
+      for (const code of shuffle(deck.main, rng))
         core.duelNewCard(duel, { team: team as 0 | 1, duelist: 0, code, controller: team as 0 | 1, location: LOC.DECK, sequence: 0, position: POS.FACEDOWN_DEFENSE });
       for (const code of deck.extra)
         core.duelNewCard(duel, { team: team as 0 | 1, duelist: 0, code, controller: team as 0 | 1, location: LOC.EXTRA, sequence: 0, position: POS.FACEDOWN_DEFENSE });
@@ -70,7 +125,7 @@ export class DuelEngine {
   /** Fait avancer le duel jusqu'à la prochaine décision humaine. */
   run(retry = false) {
     let isRetry = retry;
-    for (let guard = 0; guard < 2000 && !this.finished; guard++) {
+    for (let guard = 0; guard < 50000 && !this.finished; guard++) {
       const status = this.core.duelProcess(this.duel);
       const messages = this.core.duelGetMessage(this.duel);
       let prompt: OcgMessage | null = null;
@@ -109,9 +164,15 @@ export class DuelEngine {
         isRetry = false;
         continue;
       }
+      const auto = isRetry ? null : autoResponse(prompt);
+      if (auto) {
+        this.core.duelSetResponse(this.duel, auto);
+        continue;
+      }
       this.emit({ kind: "prompt", message: prompt, hint: this.hintText(prompt, this.hint[player]), retry: isRetry });
       return;
     }
+    if (!this.finished) this.emit({ kind: "error", error: "Le duel ne progresse plus (boucle du moteur)." });
   }
 
   respond(response: OcgResponse) {
@@ -119,6 +180,18 @@ export class DuelEngine {
     this.hint = [0n, 0n];
     this.core.duelSetResponse(this.duel, response);
     this.run();
+  }
+
+  /** Temps de réflexion écoulé : on passe la main ou on laisse l'IA trancher les choix obligatoires. */
+  timeout() {
+    const p = this.pending;
+    if (this.finished || !p) return;
+    let r: OcgResponse;
+    if (p.type === T.SELECT_IDLECMD) r = { type: OcgResponseType.SELECT_IDLECMD, action: p.to_ep ? 7 : 6, index: null };
+    else if (p.type === T.SELECT_BATTLECMD) r = { type: OcgResponseType.SELECT_BATTLECMD, action: p.to_ep ? 3 : 2, index: null };
+    else if (p.type === T.SELECT_CHAIN && !p.forced) r = { type: OcgResponseType.SELECT_CHAIN, index: null };
+    else r = this.ai.respond(p, this.state(), false);
+    this.respond(r);
   }
 
   /** Indique si le prochain pas sera joué par l'IA (pour temporiser l'affichage). */
@@ -141,6 +214,8 @@ export class DuelEngine {
     switch (m.type) {
       case T.NEW_TURN: this.turn++; this.turnPlayer = m.player; break;
       case T.NEW_PHASE: this.phase = m.phase; break;
+      case T.CHAIN_SOLVING: this.solving = m.chain_size; break;
+      case T.CHAIN_END: this.solving = 0; break;
       case T.DAMAGE: case T.PAY_LPCOST: this.lp[m.player] = Math.max(0, this.lp[m.player] - m.amount); break;
       case T.RECOVER: this.lp[m.player] += m.amount; break;
       case T.LPUPDATE: this.lp[m.player] = m.lp; break;
@@ -171,6 +246,7 @@ export class DuelEngine {
       turn: this.turn,
       turnPlayer: this.turnPlayer,
       phase: this.phase,
+      solving: this.solving,
       chain: field.chain.map((c) => ({
         code: c.code, controller: c.controller, location: c.location, sequence: c.sequence, description: this.db.desc(c.description),
       })),
