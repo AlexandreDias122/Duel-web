@@ -1,0 +1,303 @@
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { OcgMessageType as T, OcgResponseType as R } from "ocgcore-wasm";
+import type { OcgLocation, OcgResponse } from "ocgcore-wasm";
+import { DuelController } from "../engine/controller";
+import type { DuelMode } from "../engine/controller";
+import type { DeckList, FieldCard } from "../engine/protocol";
+import { LOC, PHASE_SHORT } from "../lib/constants";
+import { CardDetail } from "../ui/CardDetail";
+import { CardImage } from "../ui/CardImage";
+import { Field } from "../ui/Field";
+import { cardKey } from "../ui/keys";
+import { PromptPanel } from "../ui/PromptPanel";
+import { cardActions, placeZones } from "../ui/promptLogic";
+import type { CardAction } from "../ui/promptLogic";
+import { useDb } from "../ui/dbContext";
+
+interface Props {
+  mode: DuelMode;
+  decks: [DeckList, DeckList];
+  /** Joueur humain (en mode IA), 0 s'il commence. */
+  human: number;
+  names: [string, string];
+  onExit: () => void;
+  onRematch: () => void;
+}
+
+type Inspect = { code: number; actions: CardAction[] } | null;
+type PileView = { player: number; location: number } | null;
+
+export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Props) {
+  const db = useDb();
+  const controller = useMemo(() => new DuelController(db, mode, decks, human), [db, mode, decks, human]);
+  useEffect(() => () => controller.dispose(), [controller]);
+  const view = useSyncExternalStore(controller.subscribe, controller.getView);
+  const [inspect, setInspect] = useState<Inspect>(null);
+  const [pile, setPile] = useState<PileView>(null);
+  const [showLog, setShowLog] = useState(false);
+  const [chosenZones, setChosenZones] = useState<string[]>([]);
+  const { state, prompt } = view;
+  const msg = prompt?.message;
+
+  const respond = (r: OcgResponse) => {
+    setInspect(null);
+    setPile(null);
+    setChosenZones([]);
+    controller.respond(r);
+  };
+
+  // Réponses automatiques : pas de carte à enchaîner, tri par défaut.
+  useEffect(() => {
+    if (!msg) return;
+    if (msg.type === T.SELECT_CHAIN && msg.selects.length === 0) respond({ type: R.SELECT_CHAIN, index: null });
+    else if (msg.type === T.SORT_CARD || msg.type === T.SORT_CHAIN) respond({ type: R.SORT_CARD, order: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [msg]);
+
+  const actions = useMemo(() => cardActions(msg, db), [msg, db]);
+  const zones = useMemo(() => placeZones(msg), [msg]);
+  const targets = useMemo(() => {
+    const s = new Set<string>();
+    if (msg && (msg.type === T.SELECT_CARD || msg.type === T.SELECT_TRIBUTE)) msg.selects.forEach((c) => s.add(cardKey(c.controller, c.location, c.sequence)));
+    if (msg && msg.type === T.SELECT_UNSELECT_CARD) msg.select_cards.forEach((c) => s.add(cardKey(c.controller, c.location, c.sequence)));
+    return s;
+  }, [msg]);
+
+  const promptPlayer = msg && "player" in msg ? msg.player : undefined;
+  // En solo, la vue suit le joueur du tour ; contre l'IA, on reste du côté humain.
+  const viewer = mode === "ai" ? human : (state?.turnPlayer ?? 0);
+  const logRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    logRef.current?.scrollTo(0, logRef.current.scrollHeight);
+  }, [view.log, showLog]);
+
+  if (view.error) {
+    return (
+      <div className="screen center">
+        <h2>Erreur du moteur</h2>
+        <pre className="error">{view.error}</pre>
+        <button onClick={onExit}>Retour au menu</button>
+      </div>
+    );
+  }
+  if (!state) {
+    return (
+      <div className="screen center">
+        <div className="spinner" />
+        <p>{view.loading ?? "Préparation du duel…"}</p>
+      </div>
+    );
+  }
+
+  const me = state.players[viewer];
+  const op = state.players[1 - viewer];
+  const label = (p: number) => (mode === "ai" ? (p === human ? names[0] : names[1]) : names[p]);
+
+  const onCard = (controller: number, location: number, sequence: number, card: FieldCard) => {
+    const list = actions.get(cardKey(controller, location, sequence)) ?? [];
+    if (card.code || list.length) setInspect({ code: card.code, actions: list });
+  };
+  const onZone = (player: number, location: number, sequence: number) => {
+    if (!msg || (msg.type !== T.SELECT_PLACE && msg.type !== T.SELECT_DISFIELD)) return;
+    const key = cardKey(player, location, sequence);
+    const next = chosenZones.includes(key) ? chosenZones.filter((k) => k !== key) : [...chosenZones, key];
+    if (next.length >= msg.count) {
+      const places = next.slice(0, msg.count).map((k) => {
+        const [pl, loc, seq] = k.split("-").map(Number);
+        return { player: pl, location: loc as OcgLocation, sequence: seq };
+      });
+      respond({ type: msg.type === T.SELECT_PLACE ? R.SELECT_PLACE : R.SELECT_DISFIELD, places });
+    } else setChosenZones(next);
+  };
+
+  // Bouton de phase façon Master Duel
+  const phaseButtons: { label: string; response: OcgResponse }[] = [];
+  if (msg?.type === T.SELECT_IDLECMD) {
+    if (msg.to_bp) phaseButtons.push({ label: "Battle Phase", response: { type: R.SELECT_IDLECMD, action: 6, index: null } });
+    if (msg.to_ep) phaseButtons.push({ label: "Fin du tour", response: { type: R.SELECT_IDLECMD, action: 7, index: null } });
+  } else if (msg?.type === T.SELECT_BATTLECMD) {
+    if (msg.to_m2) phaseButtons.push({ label: "Main Phase 2", response: { type: R.SELECT_BATTLECMD, action: 2, index: null } });
+    if (msg.to_ep) phaseButtons.push({ label: "Fin du tour", response: { type: R.SELECT_BATTLECMD, action: 3, index: null } });
+  }
+
+  const handFor = (player: number, cards: FieldCard[], top: boolean) => {
+    const visible = !top || mode === "solo";
+    return (
+      <div className={`hand ${top ? "hand-top" : ""}`}>
+        {cards.map((c, i) => {
+          const key = cardKey(player, LOC.HAND, i);
+          const act = actions.has(key);
+          return (
+            <div key={i} className={`hand-card ${act ? "zone-actionable" : ""} ${targets.has(key) ? "zone-target" : ""}`}
+              onClick={() => visible || c.isPublic ? onCard(player, LOC.HAND, i, c) : undefined}>
+              <CardImage code={c.code} back={!visible && !c.isPublic} />
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const pileCards = pile
+    ? (pile.location === LOC.GRAVE ? state.players[pile.player].grave
+      : pile.location === LOC.REMOVED ? state.players[pile.player].removed
+      : pile.location === LOC.EXTRA ? state.players[pile.player].extra : [])
+    : [];
+  const pileHidden = (c: FieldCard) =>
+    pile?.location === LOC.EXTRA && pile.player !== viewer && mode === "ai" && !(c.position & 0x5);
+
+  const phaseActive = (mask: number) => (state.phase & mask) !== 0;
+  const waitingAi = !prompt && !view.end;
+  const myTurn = state.turnPlayer === viewer;
+
+  return (
+    <div className="duel">
+      <div className="duel-bar duel-bar-top">
+        <PlayerBadge name={label(1 - viewer)} lp={op.lp} active={!myTurn} />
+        {handFor(1 - viewer, op.hand, true)}
+        <button className="ghost icon" onClick={() => setShowLog(!showLog)} title="Journal">☰</button>
+      </div>
+
+      <div className="duel-board">
+        <Field
+          state={state}
+          viewer={viewer}
+          actionable={new Set(actions.keys())}
+          zones={zones}
+          chosenZones={new Set(chosenZones)}
+          targets={targets}
+          revealAll={mode === "solo"}
+          onCard={onCard}
+          onZone={onZone}
+          onPile={(player, location) => location !== LOC.DECK && setPile({ player, location })}
+        />
+        {state.chain.length > 0 && (
+          <div className="chain">
+            {state.chain.map((c, i) => (
+              <div key={i} className="chain-link" onClick={() => setInspect({ code: c.code, actions: [] })}>
+                <CardImage code={c.code} />
+                <span>{i + 1}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {view.flash && <Flash key={view.flash.id} code={view.flash.code} text={view.flash.text} />}
+        {(msg?.type === T.SELECT_PLACE || msg?.type === T.SELECT_DISFIELD) && (
+          <div className="banner">{prompt?.hint || "Choisissez une zone"} ({chosenZones.length}/{msg.count})</div>
+        )}
+      </div>
+
+      <div className="duel-bottom">
+        {handFor(viewer, me.hand, false)}
+        <div className="duel-bar">
+          <PlayerBadge name={label(viewer)} lp={me.lp} active={myTurn} />
+          <div className="phases">
+            <span className="turn">T{state.turn}</span>
+            {PHASE_SHORT.map(([mask, n]) => (
+              <span key={n} className={`phase ${phaseActive(mask) ? "on" : ""} ${myTurn ? "mine" : ""}`}>{n}</span>
+            ))}
+          </div>
+          <div className="phase-actions">
+            {phaseButtons.map((b) => <button key={b.label} className="primary small-btn" onClick={() => respond(b.response)}>{b.label}</button>)}
+            {waitingAi && <span className="muted small">{mode === "ai" ? "L'IA réfléchit…" : "…"}</span>}
+          </div>
+        </div>
+      </div>
+
+      {prompt && msg && msg.type !== T.SELECT_IDLECMD && msg.type !== T.SELECT_BATTLECMD && (
+        <PromptPanel
+          key={prompt.id}
+          prompt={prompt}
+          respond={respond}
+          inspect={(code) => setInspect({ code, actions: [] })}
+          playerLabel={mode === "solo" && promptPlayer !== undefined ? label(promptPlayer) : ""}
+        />
+      )}
+
+      {pile && (
+        <div className="sheet-backdrop" onClick={() => setPile(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-head">
+              <strong>{{ [LOC.GRAVE]: "Cimetière", [LOC.REMOVED]: "Bannies", [LOC.EXTRA]: "Extra Deck" }[pile.location]} — {label(pile.player)}</strong>
+              <button className="ghost" onClick={() => setPile(null)}>✕</button>
+            </div>
+            <div className="pick-grid">
+              {pileCards.map((c, i) => {
+                const key = cardKey(pile.player, pile.location, i);
+                return (
+                  <div key={i} className={`pick ${actions.has(key) ? "zone-actionable" : ""}`}
+                    onClick={() => !pileHidden(c) && setInspect({ code: c.code, actions: actions.get(key) ?? [] })}>
+                    <CardImage code={c.code} back={pileHidden(c)} />
+                  </div>
+                );
+              })}
+              {pileCards.length === 0 && <p className="muted">Vide</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inspect && (
+        <div className="sheet-backdrop" onClick={() => setInspect(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-head">
+              <span />
+              <button className="ghost" onClick={() => setInspect(null)}>✕</button>
+            </div>
+            {inspect.actions.length > 0 && (
+              <div className="action-list">
+                {inspect.actions.map((a, i) => <button key={i} className="primary" onClick={() => respond(a.response)}>{a.label}</button>)}
+              </div>
+            )}
+            {inspect.code > 0 && <CardDetail code={inspect.code} />}
+          </div>
+        </div>
+      )}
+
+      {showLog && (
+        <div className="log" ref={logRef}>
+          {view.log.map((l, i) => <div key={i} className={l.player === viewer ? "log-me" : l.player === 1 - viewer ? "log-op" : "log-sys"}>{l.text}</div>)}
+        </div>
+      )}
+
+      {view.end && (
+        <div className="end-overlay">
+          <h1 className={view.end.winner === viewer || mode === "solo" ? "win" : "lose"}>
+            {mode === "solo" ? `${label(view.end.winner)} gagne !` : view.end.winner === human ? "VICTOIRE" : view.end.winner < 0 ? "ÉGALITÉ" : "DÉFAITE"}
+          </h1>
+          <p>{view.end.reason}</p>
+          <div className="sheet-actions">
+            <button className="primary" onClick={onRematch}>Rejouer</button>
+            <button onClick={onExit}>Menu</button>
+          </div>
+        </div>
+      )}
+      <button className="quit" onClick={() => confirm("Abandonner le duel ?") && onExit()} title="Quitter">⏻</button>
+    </div>
+  );
+}
+
+function PlayerBadge({ name, lp, active }: { name: string; lp: number; active: boolean }) {
+  return (
+    <div className={`badge-player ${active ? "active" : ""}`}>
+      <span className="pname">{name}</span>
+      <span className="lp">LP <b>{lp}</b></span>
+    </div>
+  );
+}
+
+function Flash({ code, text }: { code: number; text: string }) {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setOn(false), 900);
+    return () => clearTimeout(t);
+  }, []);
+  if (!on) return null;
+  return (
+    <div className="flash">
+      <CardImage code={code} big />
+      <span>{text}</span>
+    </div>
+  );
+}
+
