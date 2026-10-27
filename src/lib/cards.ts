@@ -140,13 +140,11 @@ export function loadCardDb(base: string): Promise<CardDb> {
   return loading;
 }
 
-export const IMAGE_BASES = [
-  "https://images.ygoprodeck.com/images/cards_small/",
-  "https://pics.projectignis.org:2096/pics/",
-];
-
-export function cardImage(id: number, size: "small" | "big" = "small", fallback = 0): string {
-  if (fallback >= IMAGE_BASES.length) return "";
-  const base = size === "big" && fallback === 0 ? "https://images.ygoprodeck.com/images/cards/" : IMAGE_BASES[fallback];
-  return `${base}${id}.jpg`;
+/** Sources d'images, de la meilleure à la plus sûre. "art" = illustration seule (terrain, façon Master Duel). */
+export function cardImageSources(id: number, variant: "full" | "big" | "art"): string[] {
+  const ygopd = "https://images.ygoprodeck.com/images/";
+  const ignis = `https://pics.projectignis.org:2096/pics/${id}.jpg`;
+  if (variant === "art") return [`${ygopd}cards_cropped/${id}.jpg`];
+  if (variant === "big") return [`${ygopd}cards/${id}.jpg`, ignis];
+  return [`${ygopd}cards_small/${id}.jpg`, ignis];
 }

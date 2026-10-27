@@ -4,7 +4,7 @@ import type { OcgLocation, OcgResponse } from "ocgcore-wasm";
 import { DuelController } from "../engine/controller";
 import type { DuelMode } from "../engine/controller";
 import type { DeckList, FieldCard } from "../engine/protocol";
-import { LOC, PHASE_SHORT } from "../lib/constants";
+import { LOC, PHASE } from "../lib/constants";
 import { CardDetail } from "../ui/CardDetail";
 import { CardImage } from "../ui/CardImage";
 import { Field } from "../ui/Field";
@@ -146,16 +146,18 @@ export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Pro
   const pileHidden = (c: FieldCard) =>
     pile?.location === LOC.EXTRA && pile.player !== viewer && mode === "ai" && !(c.position & 0x5);
 
-  const phaseActive = (mask: number) => (state.phase & mask) !== 0;
   const waitingAi = !prompt && !view.end;
   const myTurn = state.turnPlayer === viewer;
 
   return (
     <div className="duel">
-      <div className="duel-bar duel-bar-top">
-        <PlayerBadge name={label(1 - viewer)} lp={op.lp} active={!myTurn} />
+      <div className="duel-top">
+        <div className="top-tools">
+          <button className="tool" onClick={() => confirm("Abandonner le duel ?") && onExit()} title="Quitter">✕</button>
+          <button className="tool" onClick={() => setShowLog(!showLog)} title="Journal">☰</button>
+        </div>
         {handFor(1 - viewer, op.hand, true)}
-        <button className="ghost icon" onClick={() => setShowLog(!showLog)} title="Journal">☰</button>
+        <LpPlate name={label(1 - viewer)} lp={op.lp} active={!myTurn} side="op" />
       </div>
 
       <div className="duel-board">
@@ -189,20 +191,17 @@ export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Pro
 
       <div className="duel-bottom">
         {handFor(viewer, me.hand, false)}
-        <div className="duel-bar">
-          <PlayerBadge name={label(viewer)} lp={me.lp} active={myTurn} />
-          <div className="phases">
-            <span className="turn">T{state.turn}</span>
-            {PHASE_SHORT.map(([mask, n]) => (
-              <span key={n} className={`phase ${phaseActive(mask) ? "on" : ""} ${myTurn ? "mine" : ""}`}>{n}</span>
-            ))}
-          </div>
-          <div className="phase-actions">
-            {phaseButtons.map((b) => <button key={b.label} className="primary small-btn" onClick={() => respond(b.response)}>{b.label}</button>)}
-            {waitingAi && <span className="muted small">{mode === "ai" ? "L'IA réfléchit…" : "…"}</span>}
-          </div>
-        </div>
+        <LpPlate name={label(viewer)} lp={me.lp} active={myTurn} side="me" />
       </div>
+
+      <PhaseOrb
+        turn={state.turn}
+        phase={state.phase}
+        mine={myTurn}
+        waiting={waitingAi && mode === "ai"}
+        buttons={phaseButtons}
+        onPick={(r) => respond(r)}
+      />
 
       {prompt && msg && msg.type !== T.SELECT_IDLECMD && msg.type !== T.SELECT_BATTLECMD && (
         <PromptPanel
@@ -272,16 +271,59 @@ export function DuelScreen({ mode, decks, human, names, onExit, onRematch }: Pro
           </div>
         </div>
       )}
-      <button className="quit" onClick={() => confirm("Abandonner le duel ?") && onExit()} title="Quitter">⏻</button>
     </div>
   );
 }
 
-function PlayerBadge({ name, lp, active }: { name: string; lp: number; active: boolean }) {
+function LpPlate({ name, lp, active, side }: { name: string; lp: number; active: boolean; side: "me" | "op" }) {
+  const [shown, setShown] = useState(lp);
+  const [hit, setHit] = useState(0);
+  // Les LP défilent jusqu'à la nouvelle valeur, comme dans Master Duel.
+  useEffect(() => {
+    if (shown === lp) return;
+    if (lp < shown) setHit((h) => h + 1);
+    const step = Math.max(10, Math.round(Math.abs(lp - shown) / 12));
+    const t = setTimeout(() => setShown((v) => (v < lp ? Math.min(lp, v + step) : Math.max(lp, v - step))), 30);
+    return () => clearTimeout(t);
+  }, [lp, shown]);
   return (
-    <div className={`badge-player ${active ? "active" : ""}`}>
-      <span className="pname">{name}</span>
-      <span className="lp">LP <b>{lp}</b></span>
+    <div className={`lp-plate lp-${side} ${active ? "active" : ""}`}>
+      <div className="avatar">{name.slice(0, 1).toUpperCase()}</div>
+      <div className="lp-body">
+        <span className="pname">{name}</span>
+        <span key={hit} className={`lp-value ${hit ? "lp-hit" : ""}`}><small>LP</small>{shown}</span>
+        <span className="lp-bar"><span style={{ width: `${Math.max(0, Math.min(100, (shown / 8000) * 100))}%` }} /></span>
+      </div>
+    </div>
+  );
+}
+
+const PHASE_LABELS: [number, string][] = [
+  [PHASE.DRAW, "Draw"], [PHASE.STANDBY, "Standby"], [PHASE.MAIN1, "Main 1"], [0x8 | 0x10 | 0x20 | 0x40 | 0x80, "Battle"],
+  [PHASE.MAIN2, "Main 2"], [PHASE.END, "End"],
+];
+
+function PhaseOrb({ turn, phase, mine, waiting, buttons, onPick }: {
+  turn: number; phase: number; mine: boolean; waiting: boolean;
+  buttons: { label: string; response: OcgResponse }[]; onPick: (r: OcgResponse) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const label = PHASE_LABELS.find(([m]) => phase & m)?.[1] ?? "";
+  const ready = buttons.length > 0;
+  return (
+    <div className="phase-wrap">
+      {open && ready && (
+        <div className="phase-menu">
+          {buttons.map((b) => (
+            <button key={b.label} onClick={() => { setOpen(false); onPick(b.response); }}>{b.label}</button>
+          ))}
+        </div>
+      )}
+      <button className={`phase-orb ${mine ? "mine" : "op"} ${ready ? "ready" : ""} ${waiting ? "thinking" : ""}`}
+        onClick={() => ready && setOpen(!open)}>
+        <small>Tour {turn}</small>
+        <b>{label}</b>
+      </button>
     </div>
   );
 }

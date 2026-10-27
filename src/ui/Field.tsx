@@ -49,7 +49,13 @@ export function Field(p: FieldProps) {
   for (let i = 0; i < 5; i++) add(5, 2 + i, <Zone {...p} player={me} location={LOC.SZONE} seq={i} />);
   add(5, 7, <Pile {...p} player={me} location={LOC.DECK} />);
 
-  return <div className="field">{cells}</div>;
+  return (
+    <div className="mat-wrap">
+      <div className="mat">
+        <div className="field">{cells}</div>
+      </div>
+    </div>
+  );
 }
 
 function ExtraZone(p: FieldProps & { left: boolean }) {
@@ -98,7 +104,7 @@ function FieldCardView({ card, opp, reveal, monsterZone }: { card: FieldCard; op
   const counters = Object.values(card.counters).reduce((a, b) => a + b, 0);
   return (
     <div className={`fcard ${defense ? "fcard-def" : ""} ${opp ? "fcard-opp" : ""}`}>
-      <CardImage code={card.code} back={facedown && (!reveal || !card.code)} className={facedown ? "facedown" : ""} />
+      <CardImage code={card.code} art back={facedown && (!reveal || !card.code)} className={facedown ? "facedown" : ""} />
       {isMonster && !facedown && card.position & POS.FACEUP && (
         <div className={`stats ${card.attack > card.baseAttack ? "up" : card.attack < card.baseAttack ? "down" : ""}`}>
           {card.attack}{!isLink && <span>/{card.defense}</span>}
@@ -121,7 +127,8 @@ function Pile(p: FieldProps & { player: number; location: number }) {
   const actionable = list?.some((_, i) => p.actionable.has(cardKey(p.player, p.location, i)));
   return (
     <div className={`pile ${actionable ? "zone-actionable" : ""} ${p.player !== p.viewer ? "zone-opp" : ""}`} onClick={() => p.onPile(p.player, p.location)}>
-      {count > 0 ? <CardImage code={top?.code ?? 0} back={!faceUp && !(top && top.position & POS.FACEUP)} /> : <div className="pile-empty" />}
+      <div className={`socket socket-${p.location === LOC.GRAVE ? "gy" : p.location === LOC.REMOVED ? "ban" : p.location === LOC.EXTRA ? "extra" : "deck"}`} />
+      {count > 0 && <div className={`pile-stack ${faceUp ? "" : "pile-thick"}`}><CardImage code={top?.code ?? 0} art={faceUp} back={!faceUp && !(top && top.position & POS.FACEUP)} /></div>}
       <div className="pile-label">{label} <b>{count}</b></div>
     </div>
   );

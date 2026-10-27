@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { cardImage, isMonster } from "../lib/cards";
-import { TYPE } from "../lib/constants";
+import { cardImageSources } from "../lib/cards";
+import { CardFrame } from "./CardFrame";
+import { frameOf } from "./frame";
 import { useDb } from "./dbContext";
 
 interface Props {
@@ -8,41 +9,36 @@ interface Props {
   /** Afficher le dos de la carte. */
   back?: boolean;
   big?: boolean;
+  /** Illustration seule dans un cadre (cartes posées sur le terrain, façon Master Duel). */
+  art?: boolean;
   className?: string;
   onClick?: () => void;
 }
 
-/** Image d'une carte, avec repli sur une source alternative puis sur un cadre texte. */
-export function CardImage({ code, back, big, className = "", onClick }: Props) {
+/** Image d'une carte, avec repli sur d'autres sources puis sur une carte dessinée en CSS. */
+export function CardImage({ code, back, big, art, className = "", onClick }: Props) {
   const db = useDb();
-  const [fallback, setFallback] = useState(0);
-  const [failedFor, setFailedFor] = useState<number | null>(null);
+  const [state, setState] = useState({ code, index: 0 });
   if (back || !code) return <div className={`card-img card-back ${className}`} onClick={onClick} />;
   const card = db.get(code);
-  const src = failedFor === code ? "" : cardImage(code, big ? "big" : "small", fallback);
-  if (!src) {
-    const frame = !card ? "" : card.type & TYPE.SPELL ? "spell" : card.type & TYPE.TRAP ? "trap" : card.type & TYPE.LINK ? "link"
-      : card.type & TYPE.XYZ ? "xyz" : card.type & TYPE.SYNCHRO ? "synchro" : card.type & TYPE.FUSION ? "fusion"
-      : card.type & TYPE.RITUAL ? "ritual" : card.type & TYPE.NORMAL ? "normal" : "effect";
-    return (
-      <div className={`card-img card-text frame-${frame} ${className}`} onClick={onClick}>
-        <span className="card-text-name">{card?.name ?? code}</span>
-        {card && isMonster(card) && <span className="card-text-stats">{card.atk}/{card.type & TYPE.LINK ? `L${card.level}` : card.def}</span>}
-      </div>
-    );
-  }
-  return (
+  const sources = cardImageSources(code, art ? "art" : big ? "big" : "full");
+  const index = state.code === code ? state.index : 0;
+  if (index >= sources.length) return <CardFrame card={card} className={`card-img ${className}`} onClick={onClick} />;
+  const img = (
     <img
-      className={`card-img ${className}`}
-      src={src}
+      className={art ? "art-img" : `card-img ${className}`}
+      src={sources[index]}
       alt={card?.name ?? String(code)}
       loading="lazy"
       draggable={false}
-      onClick={onClick}
-      onError={() => {
-        if (fallback + 1 < 2) setFallback(fallback + 1);
-        else setFailedFor(code);
-      }}
+      onClick={art ? undefined : onClick}
+      onError={() => setState({ code, index: index + 1 })}
     />
+  );
+  if (!art) return img;
+  return (
+    <div className={`card-img art-card frame-${frameOf(card)} ${className}`} onClick={onClick}>
+      {img}
+    </div>
   );
 }

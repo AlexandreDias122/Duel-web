@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CardDb } from "./lib/cards";
-import { loadCardDb } from "./lib/cards";
+import { cardImageSources, loadCardDb } from "./lib/cards";
 import type { Banlist, Deck } from "./lib/deck";
 import { loadDecks, saveDecks } from "./lib/deck";
 import { DbContext } from "./ui/dbContext";
@@ -90,27 +90,39 @@ export default function App() {
   return <DbContext.Provider value={{ db: data.db, banlists: data.banlists }}>{content}</DbContext.Provider>;
 }
 
+const HERO_CARDS = [89631139, 46986414, 74677422, 70095154, 44508094, 10000020];
+
 function Home({ go, deckCount }: { go: (r: Route) => void; deckCount: number }) {
+  const [active, setActive] = useState(0);
+  const [hero] = useState(() => HERO_CARDS[Math.floor(Math.random() * HERO_CARDS.length)]);
+  const [heroOk, setHeroOk] = useState(true);
+  const items: { label: string; sub: string; route: Route }[] = [
+    { label: "SOLO", sub: "Duel contre l'IA", route: { name: "setup", mode: "ai" } },
+    { label: "DUEL LIBRE", sub: "Jouez les deux côtés", route: { name: "setup", mode: "solo" } },
+    { label: "DECK", sub: `${deckCount} deck(s) · éditeur`, route: { name: "decks" } },
+  ];
   return (
-    <div className="screen home">
-      <h1 className="logo">DUEL<span>WEB</span></h1>
-      <p className="muted tagline">Yu-Gi-Oh! dans le navigateur, sans rien installer.</p>
-      <nav className="home-menu">
-        <button className="home-btn hb-duel" onClick={() => go({ name: "setup", mode: "ai" })}>
-          <b>Duel contre l'IA</b><span>Affrontez une IA basique</span>
-        </button>
-        <button className="home-btn hb-solo" onClick={() => go({ name: "setup", mode: "solo" })}>
-          <b>Duel solo</b><span>Jouez les deux côtés pour tester vos combos</span>
-        </button>
-        <button className="home-btn hb-decks" onClick={() => go({ name: "decks" })}>
-          <b>Mes decks</b><span>{deckCount} deck(s) · éditeur, import .ydk / YDKE</span>
-        </button>
-      </nav>
-      <InstallHint />
-      <footer className="muted small credits">
-        Moteur ygopro-core (EDOPro) et données Project Ignis. Images : YGOPRODeck.
-        Projet de fans non officiel, sans lien avec Konami.
-      </footer>
+    <div className="home">
+      {heroOk && <img className="home-hero" src={cardImageSources(hero, "art")[0]} alt="" onError={() => setHeroOk(false)} />}
+      <div className="home-shade" />
+      <div className="home-content">
+        <h1 className="home-title">DuelWeb <small>v0.1</small></h1>
+        <nav className="home-menu">
+          {items.map((it, i) => (
+            <button key={it.label} className={`home-item ${active === i ? "on" : ""}`}
+              onPointerEnter={() => setActive(i)} onFocus={() => setActive(i)} onClick={() => go(it.route)}>
+              <span className="home-label">{it.label}</span>
+              <span className="home-sub">{it.sub}</span>
+              {active === i && <span className="home-arrow">›</span>}
+            </button>
+          ))}
+        </nav>
+        <InstallHint />
+        <footer className="credits">
+          Moteur ygopro-core (EDOPro) et données Project Ignis. Images : YGOPRODeck.
+          Projet de fans non officiel, sans lien avec Konami.
+        </footer>
+      </div>
     </div>
   );
 }
