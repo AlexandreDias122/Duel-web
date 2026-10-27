@@ -240,11 +240,17 @@ export class DuelEngine {
   }
 
   state(): DuelState {
+    const field = this.core.duelQueryField(this.duel);
+    // Les LP viennent du moteur lui-même : le suivi par messages pouvait dériver (SetLP, coûts…).
+    const lpOf = (p: number) => {
+      const raw = (field.players[p] as unknown as { lp?: number }).lp;
+      return raw === undefined ? this.lp[p] : Math.max(0, raw | 0);
+    };
     const players = [0, 1].map((p): PlayerState => {
       const loc = (l: number) => this.queryLocation(p, l);
       const szone = loc(LOC.SZONE);
       return {
-        lp: this.lp[p],
+        lp: lpOf(p),
         hand: loc(LOC.HAND).filter((c): c is FieldCard => !!c),
         mzone: pad(loc(LOC.MZONE), 7),
         szone: pad(szone, 6),
@@ -254,7 +260,6 @@ export class DuelEngine {
         deck: this.core.duelQueryCount(this.duel, p, LOC.DECK),
       };
     }) as [PlayerState, PlayerState];
-    const field = this.core.duelQueryField(this.duel);
     return {
       players,
       turn: this.turn,

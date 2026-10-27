@@ -36,7 +36,17 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
   const controller = useMemo(() => new DuelController(db, mode, decks, human, turnSeconds), [db, mode, decks, human, turnSeconds]);
   useEffect(() => () => controller.dispose(), [controller]);
   const view = useSyncExternalStore(controller.subscribe, controller.getView);
-  const [inspect, setInspect] = useState<Inspect>(null);
+  const [inspect, setInspectRaw] = useState<Inspect>(null);
+  // Écran large (paysage, tablette, ordinateur) : fiche de la carte affichée en permanence à gauche, comme dans Master Duel.
+  const wide = useMediaQuery(WIDE_QUERY);
+  const [focus, setFocus] = useState(0);
+  const setInspect = (i: Inspect) => {
+    if (i && wide && !i.actions.length) {
+      setFocus(i.code);
+      return;
+    }
+    setInspectRaw(i);
+  };
   const [menu, setMenu] = useState<Menu>(null);
   const [pile, setPile] = useState<PileView>(null);
   const [showLog, setShowLog] = useState(false);
@@ -61,6 +71,13 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
   }, [msg]);
 
   const actions = useMemo(() => cardActions(msg, db), [msg, db]);
+
+  // La fiche suit la dernière carte jouée, tant que le joueur n'en touche pas une autre.
+  const lastFx = [...view.fx].reverse().find((f) => "code" in f && f.code > 0 && f.kind !== "leave");
+  const lastFxCode = lastFx && "code" in lastFx ? lastFx.code : 0;
+  useEffect(() => {
+    if (lastFxCode) setFocus(lastFxCode);
+  }, [lastFxCode]);
   const zones = useMemo(() => placeZones(msg), [msg]);
   const targets = useMemo(() => {
     const s = new Set<string>();
@@ -102,7 +119,10 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
   const onCard = (controller: number, location: number, sequence: number, card: FieldCard) => {
     const key = cardKey(controller, location, sequence);
     const list = actions.get(key) ?? [];
-    if (list.length) setMenu(menu?.key === key ? null : { key, code: card.code, actions: list });
+    if (list.length) {
+      setMenu(menu?.key === key ? null : { key, code: card.code, actions: list });
+      if (card.code) setFocus(card.code);
+    }
     else if (card.code) {
       setMenu(null);
       setInspect({ code: card.code, actions: [] });
@@ -180,7 +200,12 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
   const directHit = view.fx.find((f) => f.kind === "attack" && !f.to);
 
   return (
-    <div className="duel">
+    <div className={`duel ${wide ? "duel-wide" : ""}`}>
+      {wide && (
+        <aside className="card-panel">
+          {focus ? <CardDetail code={focus} /> : <p className="muted small">Touchez une carte pour afficher ses informations.</p>}
+        </aside>
+      )}
       <div className="duel-top">
         <div className="top-tools">
           <button className="tool" onClick={() => confirm("Abandonner le duel ?") && onExit()} title="Quitter">✕</button>
@@ -366,6 +391,19 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
       )}
     </div>
   );
+}
+
+const WIDE_QUERY = "(orientation: landscape) and (min-aspect-ratio: 4/3) and (min-width: 640px)";
+
+function useMediaQuery(query: string): boolean {
+  const [match, setMatch] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setMatch(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [query]);
+  return match;
 }
 
 const ACTION_ICONS: Record<string, string> = {
