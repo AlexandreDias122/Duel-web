@@ -410,8 +410,8 @@ select, input.search, .filters input {
   font-variant-numeric: tabular-nums; color: #fff; font-style: italic;
 }
 .stats span { color: #9fb4e8; font-weight: 700; }
-.stats.up { color: var(--green); }
-.stats.down { color: var(--red); }
+.stats .up { color: var(--green); }
+.stats .down { color: var(--red); }
 .badge { position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; border-radius: 8px; font-size: 10px; font-weight: 800; text-align: center; line-height: 16px; padding: 0 3px; z-index: 2; }
 .badge-xyz { background: var(--gold); color: #1a1203; }
 .badge-counter { background: var(--cyan); color: #04121a; top: auto; bottom: 10px; }
@@ -522,16 +522,6 @@ select, input.search, .filters input {
   position: absolute; left: 50%; translate: -50% 0; bottom: calc(var(--safe-bottom) + var(--cw) * 1.9 + 70px); z-index: 15; width: max-content; max-width: 80vw;
   background: rgba(0, 0, 0, 0.75); border: 1px solid var(--gold); border-radius: 16px; padding: 5px 12px; font-size: 12px; text-align: center; pointer-events: none;
 }
-.flash {
-  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  pointer-events: none; z-index: 20; animation: flash 0.9s ease-out forwards;
-  background:
-    linear-gradient(100deg, transparent 30%, rgba(255, 230, 160, 0.25) 45%, transparent 60%),
-    radial-gradient(circle, rgba(242, 196, 90, 0.3), transparent 60%);
-}
-.flash .card-img { width: min(34vw, 160px); border-radius: 8px; box-shadow: 0 0 40px rgba(242, 196, 90, 0.8); }
-.flash span { font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); text-shadow: 0 2px 10px #000; font-style: italic; }
-@keyframes flash { 0% { opacity: 0; transform: scale(0.8); } 15% { opacity: 1; transform: scale(1); } 65% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05); } }
 .banner {
   position: absolute; top: 4px; left: 50%; translate: -50% 0; z-index: 10; max-width: 92%;
   background: rgba(0, 0, 0, 0.8); border: 1px solid var(--cyan); border-radius: 20px; padding: 6px 14px; font-size: 13px; text-align: center;
@@ -613,3 +603,236 @@ select, input.search, .filters input {
 .detail-stats { display: flex; gap: 14px; margin: 8px 0 6px; }
 .detail-stats span { display: flex; flex-direction: column; font-size: 22px; font-weight: 900; font-style: italic; line-height: 1; color: #fff; }
 .detail-stats small { font-size: 10px; color: var(--gold); font-style: normal; letter-spacing: 0.08em; }
+
+/* ================= Look Master Duel ================= */
+
+/* Terrain : moitié adverse pourpre, notre moitié en pierre dorée */
+.mat {
+  background:
+    linear-gradient(180deg, transparent 49.4%, rgba(255, 220, 140, 0.9) 49.7%, rgba(255, 120, 90, 0.6) 50.3%, transparent 50.6%),
+    radial-gradient(ellipse 70% 30% at 50% 25%, rgba(190, 60, 110, 0.35), transparent 70%),
+    radial-gradient(ellipse 70% 30% at 50% 75%, rgba(255, 210, 120, 0.3), transparent 70%),
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.06) 0 6px, transparent 6px 12px),
+    linear-gradient(180deg, #3a1630 0%, #5a1f3c 22%, #6a2a3a 46%, #8c7444 54%, #a88a52 78%, #7d6438 100%);
+  box-shadow: 0 40px 50px -10px rgba(0, 0, 0, 0.75), inset 0 0 40px rgba(0, 0, 0, 0.6), inset 0 0 0 2px rgba(255, 210, 130, 0.35);
+}
+.mat::after { display: none; }
+
+/* Cases carrées ornées */
+.zone::before {
+  clip-path: polygon(8% 0, 92% 0, 100% 6%, 100% 94%, 92% 100%, 8% 100%, 0 94%, 0 6%);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 240, 200, 0.35) 0 14%, transparent 15%),
+    conic-gradient(from 45deg, rgba(0, 0, 0, 0.12) 0 25%, transparent 0 50%, rgba(0, 0, 0, 0.12) 0 75%, transparent 0),
+    linear-gradient(150deg, #d9bd7c 0%, #b8955a 55%, #8f6f3c 100%);
+  box-shadow: inset 0 0 0 2px rgba(255, 236, 180, 0.55), inset 0 0 0 4px rgba(90, 60, 20, 0.45), inset 0 0 12px rgba(60, 35, 10, 0.6);
+  opacity: 0.95;
+}
+.zone-s::before {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 240, 200, 0.25) 0 12%, transparent 13%),
+    linear-gradient(150deg, #c2ad7e 0%, #9c875a 55%, #77653e 100%);
+}
+.zone-opp::before {
+  filter: none;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 170, 200, 0.25) 0 14%, transparent 15%),
+    conic-gradient(from 45deg, rgba(0, 0, 0, 0.15) 0 25%, transparent 0 50%, rgba(0, 0, 0, 0.15) 0 75%, transparent 0),
+    linear-gradient(150deg, #7a3550 0%, #5a2340 55%, #3c1530 100%);
+  box-shadow: inset 0 0 0 2px rgba(255, 150, 190, 0.45), inset 0 0 0 4px rgba(40, 10, 30, 0.5), inset 0 0 12px rgba(20, 0, 15, 0.7);
+}
+.zone-emz::before {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 220, 0.5) 0 16%, transparent 17%),
+    linear-gradient(150deg, #f3d887 0%, #c99a3a 100%);
+}
+.zone::after { inset: 30% 30%; border: 1px solid rgba(70, 40, 10, 0.25); border-radius: 2px; transform: rotate(45deg); }
+.zone-opp::after { border-color: rgba(255, 180, 210, 0.2); }
+
+/* Cartes posées : carte entière, ATK/DEF sous la carte */
+.fcard { width: calc(var(--cw) * 0.8); }
+.fcard > .card-img { border-radius: 2px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.7); }
+.stats {
+  bottom: -11px; padding: 0 4px; border-radius: 3px; font-size: clamp(8px, calc(var(--cw) * 0.17), 12px);
+  background: rgba(8, 10, 18, 0.88); border: 1px solid rgba(255, 255, 255, 0.18); font-style: normal; letter-spacing: -0.02em;
+}
+.stats b { color: #fff; }
+.stats span { color: #b9c6e6; font-weight: 700; }
+
+/* Numéro de chaîne posé sur la carte, comme dans Master Duel */
+.chain-badge {
+  position: absolute; z-index: 5; right: -6px; top: -6px; width: 22px; height: 22px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #e9fbff, #39b8ff 55%, #0b4d8c); color: #fff; border: 1px solid #c8f1ff;
+  font-weight: 900; font-size: 13px; line-height: 21px; text-align: center; font-style: italic;
+  box-shadow: 0 0 10px rgba(80, 200, 255, 0.95); animation: badge-in 0.35s ease-out;
+}
+@keyframes badge-in { from { transform: scale(2.2); opacity: 0; } }
+
+/* Effets sur les zones */
+.zfx { position: absolute; inset: -30%; pointer-events: none; z-index: 4; display: flex; align-items: center; justify-content: center; }
+.fx-summon-layer {
+  background: radial-gradient(circle, rgba(255, 255, 230, 0.95) 0 8%, rgba(255, 210, 90, 0.75) 22%, rgba(255, 170, 40, 0.25) 45%, transparent 62%);
+  animation: burst 0.8s ease-out forwards;
+}
+.fx-summon-layer::after {
+  content: ""; position: absolute; inset: 20%; border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 240, 180, 0.9) 0 3deg, transparent 3deg 18deg);
+  mask: radial-gradient(circle, transparent 25%, #000 30%, transparent 70%); animation: spin-out 0.8s ease-out forwards;
+}
+.fx-spsummon-layer {
+  background: radial-gradient(circle, rgba(220, 255, 255, 0.95) 0 8%, rgba(60, 220, 255, 0.6) 25%, transparent 60%);
+  animation: burst 1s ease-out forwards;
+}
+.fx-spsummon-layer::before, .fx-spsummon-layer::after {
+  content: ""; position: absolute; inset: 18%; border-radius: 50%; border: 3px dashed rgba(120, 240, 255, 0.95);
+  box-shadow: 0 0 12px rgba(60, 220, 255, 0.9); animation: ring 1s ease-out forwards;
+}
+.fx-spsummon-layer::after { inset: 30%; border-style: solid; border-width: 2px; animation-delay: 0.15s; }
+.fx-flip-layer { background: radial-gradient(circle, rgba(255, 255, 255, 0.85), transparent 55%); animation: burst 0.7s ease-out forwards; }
+.fx-set-layer { background: radial-gradient(ellipse 50% 30%, rgba(255, 230, 170, 0.6), transparent 70%); animation: burst 0.5s ease-out forwards; }
+.fx-leave-layer { inset: 0; }
+.fx-leave-layer .card-img { width: calc(var(--cw) * 0.8); animation: shatter 0.65s ease-in forwards; }
+.fx-hit-layer { background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 6%, rgba(255, 90, 60, 0.7) 22%, transparent 55%); animation: burst 0.5s 0.35s ease-out both; }
+.fx-lunge-up .fcard { animation: lunge-up 0.7s ease-in-out; z-index: 6; }
+.fx-lunge-down .fcard { animation: lunge-down 0.7s ease-in-out; z-index: 6; }
+.zone.fx-lunge-up, .zone.fx-lunge-down { z-index: 6; }
+@keyframes burst { 0% { transform: scale(0.3); opacity: 0; } 25% { opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+@keyframes spin-out { from { transform: rotate(0) scale(0.5); opacity: 1; } to { transform: rotate(90deg) scale(1.4); opacity: 0; } }
+@keyframes ring { from { transform: scale(0.2) rotate(0); opacity: 1; } to { transform: scale(1.5) rotate(120deg); opacity: 0; } }
+@keyframes shatter { 0% { opacity: 1; filter: brightness(1.6); } 100% { opacity: 0; transform: translateY(-14px) scale(1.15); filter: brightness(3) blur(3px); } }
+@keyframes lunge-up { 0%, 100% { translate: 0 0; } 45% { translate: 0 calc(var(--ch) * -1.2); scale: 1.12; } 55% { translate: 0 calc(var(--ch) * -1.1); } }
+@keyframes lunge-down { 0%, 100% { translate: 0 0; } 45% { translate: 0 calc(var(--ch) * 1.2); scale: 1.12; } 55% { translate: 0 calc(var(--ch) * 1.1); } }
+
+.direct-hit { position: absolute; left: 0; right: 0; height: 30%; pointer-events: none; z-index: 8; animation: burst 0.6s 0.3s ease-out both; }
+.direct-hit.to-op { top: 0; background: radial-gradient(ellipse 60% 70% at 50% 0%, rgba(255, 80, 80, 0.7), transparent 70%); }
+.direct-hit.to-me { bottom: 0; background: radial-gradient(ellipse 60% 70% at 50% 100%, rgba(255, 80, 80, 0.7), transparent 70%); }
+
+/* Activation : terrain assombri, carte de taille moyenne au centre */
+.fx-activate {
+  position: absolute; inset: 0; z-index: 18; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.6)); animation: dim 1.1s ease-out forwards;
+}
+.fx-activate-card { position: relative; width: min(26vw, 118px); animation: activate-card 1.1s ease-out forwards; }
+.fx-activate-card .card-img { border-radius: 5px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 26px 6px rgba(80, 200, 255, 0.85); }
+.from-op .fx-activate-card .card-img { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 26px 6px rgba(255, 80, 110, 0.85); }
+.fx-activate-card .chain-num { right: -10px; bottom: -10px; width: 30px; height: 30px; line-height: 30px; font-size: 16px; }
+@keyframes dim { 0% { opacity: 0; } 15%, 75% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes activate-card {
+  0% { opacity: 0; transform: translateY(var(--from, 60px)) scale(0.7); }
+  20% { opacity: 1; transform: none; }
+  30% { filter: brightness(1.8); }
+  45% { filter: brightness(1); }
+  80% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: scale(0.9); }
+}
+.from-op { --from: -60px; }
+
+/* Bandeaux de phase / changement de tour */
+.fx-banner {
+  position: absolute; left: -10%; right: -10%; top: 46%; z-index: 19; pointer-events: none; height: 40px; transform: skewY(-4deg);
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(90deg, transparent, rgba(20, 70, 160, 0.92) 18%, rgba(30, 100, 210, 0.95) 50%, rgba(20, 70, 160, 0.92) 82%, transparent);
+  border-top: 2px solid rgba(160, 220, 255, 0.85); border-bottom: 2px solid rgba(160, 220, 255, 0.85);
+  animation: banner 1.2s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+.fx-banner.side-op {
+  background: linear-gradient(90deg, transparent, rgba(150, 20, 50, 0.92) 18%, rgba(200, 30, 70, 0.95) 50%, rgba(150, 20, 50, 0.92) 82%, transparent);
+  border-color: rgba(255, 170, 190, 0.85);
+}
+.fx-banner span {
+  font-family: "Russo One", system-ui, sans-serif; font-style: italic; font-size: clamp(18px, 6vw, 28px); text-transform: uppercase;
+  letter-spacing: 0.04em; color: #fff; text-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+.fx-banner.big { height: 50px; }
+@keyframes banner {
+  0% { clip-path: inset(0 100% 0 0); opacity: 1; }
+  25% { clip-path: inset(0 0 0 0); }
+  75% { clip-path: inset(0 0 0 0); opacity: 1; }
+  100% { clip-path: inset(0 0 0 100%); opacity: 0.6; }
+}
+
+/* CHAÎNE : les deux derniers maillons inclinés, gros numéros */
+.fx-chain { position: absolute; inset: 0; z-index: 20; pointer-events: none; display: flex; align-items: center; justify-content: center; animation: dim 1.3s ease-out forwards; }
+.fx-chain-card { position: absolute; width: min(22vw, 100px); }
+.fx-chain-card .card-img { border-radius: 4px; box-shadow: 0 0 0 2px #e8f6ff, 0 0 18px rgba(120, 220, 255, 0.9); }
+.fx-chain-card.c0 { transform: translate(-48%, 12%) rotate(-12deg); animation: chain-card-a 1.3s ease-out both; }
+.fx-chain-card.c1 { transform: translate(48%, -16%) rotate(10deg); animation: chain-card-b 1.3s ease-out both; }
+.fx-chain-card b {
+  position: absolute; right: -14px; bottom: -18px; font-family: "Russo One", system-ui, sans-serif; font-style: italic; font-size: 44px; color: #eafcff;
+  -webkit-text-stroke: 2px #1a9ad6; text-shadow: 0 0 14px rgba(80, 210, 255, 0.95);
+}
+.fx-chain-text {
+  position: relative; z-index: 2; font-family: "Russo One", system-ui, sans-serif; font-style: italic; font-size: clamp(30px, 11vw, 52px);
+  color: #fff; letter-spacing: 0.06em; text-transform: uppercase; text-shadow: 0 0 16px rgba(120, 220, 255, 0.95), 0 3px 0 #0b3a66;
+  animation: chain-text 1.3s ease-out both;
+}
+@keyframes chain-card-a { 0% { opacity: 0; transform: translate(-120%, 12%) rotate(-30deg); } 25%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes chain-card-b { 0% { opacity: 0; transform: translate(120%, -16%) rotate(30deg); } 25%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes chain-text { 0% { opacity: 0; transform: scale(2); } 25% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
+
+.fx-resolve { position: absolute; inset: 0; z-index: 20; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+.fx-resolve span {
+  font-family: "Russo One", system-ui, sans-serif; font-style: italic; font-size: clamp(28px, 10vw, 48px); text-transform: uppercase; color: #fff;
+  letter-spacing: 0.05em; text-shadow: 0 0 14px rgba(255, 255, 255, 0.8), 0 3px 0 #333; animation: resolve 0.9s ease-out forwards;
+}
+@keyframes resolve {
+  0% { opacity: 0; letter-spacing: 0.6em; filter: blur(4px); }
+  30% { opacity: 1; letter-spacing: 0.05em; filter: none; }
+  75% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: skewX(-20deg) translateX(30px); }
+}
+
+/* Dégâts : chiffres qui jaillissent près des LP */
+.duel-top, .duel-bottom { position: relative; }
+.damage-pop {
+  position: absolute; z-index: 25; pointer-events: none; font-family: "Russo One", system-ui, sans-serif; font-style: italic;
+  font-size: 30px; color: #ff4d5e; text-shadow: 0 0 10px rgba(255, 60, 80, 0.9), 0 2px 0 #400; animation: pop 1.3s ease-out forwards;
+}
+.duel-top .damage-pop { right: 90px; top: 64px; }
+.duel-bottom .damage-pop { left: 150px; bottom: 60px; }
+.damage-pop.heal { color: #6dff9b; text-shadow: 0 0 10px rgba(60, 255, 120, 0.9), 0 2px 0 #040; }
+@keyframes pop { 0% { opacity: 0; transform: scale(2); } 15% { opacity: 1; transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-24px); } }
+
+.thinking-dots { color: var(--muted); font-size: 11px; font-weight: 400; margin-left: 4px; }
+.thinking-dots i { font-style: normal; animation: blink 1.2s infinite; }
+.thinking-dots i:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+
+/* Hexagone de phase, à droite du terrain comme dans Master Duel */
+.duel-board .phase-wrap { position: absolute; right: 2px; top: 50%; bottom: auto; translate: 0 -50%; z-index: 16; flex-direction: row; }
+.duel-board .phase-menu { order: -1; }
+.phase-orb {
+  width: 66px; height: 58px; border-radius: 0; border: none; padding: 0;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: linear-gradient(180deg, #ffe39a, #c98a1e 50%, #8a5208);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; box-shadow: none;
+}
+.phase-orb::before {
+  content: ""; position: absolute; inset: 3px; clip-path: inherit;
+  background: radial-gradient(circle at 50% 35%, #d23a2a, #7a1010 70%);
+}
+.phase-orb.op::before { background: radial-gradient(circle at 50% 35%, #8a2a5a, #3a0a24 70%); }
+.phase-orb > * { position: relative; z-index: 1; }
+.phase-orb small { font-size: 8px; }
+.phase-orb b { font-size: 13px; font-style: italic; text-shadow: 0 1px 0 #000; }
+.phase-orb.ready { box-shadow: none; animation: none; filter: drop-shadow(0 0 6px rgba(255, 210, 90, 0.95)); }
+.phase-orb.ready::after {
+  content: ""; position: absolute; inset: 0; clip-path: inherit; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+  background-size: 250% 100%; animation: shine 1.6s infinite; z-index: 2; border: none; border-radius: 0;
+}
+.phase-orb.thinking::after { display: none; }
+@keyframes shine { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+
+/* Pile de chaîne compacte */
+.chain { padding: 4px 3px; gap: 3px; border-radius: 8px; }
+.chain-link { width: calc(var(--cw) * 0.48); }
+.chain-num { width: 18px; height: 18px; line-height: 18px; font-size: 11px; }
+.chain-title { font-size: 8px; }
+.phase-orb.op, .phase-orb.mine { background: linear-gradient(180deg, #ffe39a, #c98a1e 50%, #8a5208); box-shadow: none; border: none; }
+.clock { bottom: calc(var(--safe-bottom) + 20px); }
+/* L'hexagone se place au centre, entre les deux Zones Monstre Extra */
+.duel-board .phase-wrap { left: 50%; right: auto; top: 50%; translate: -50% -50%; }
+.duel-board .phase-menu { position: absolute; bottom: calc(100% + 8px); left: 50%; translate: -50% 0; z-index: 17; }
+.fcard-def { transform: rotate(90deg) scale(0.74); }
+.fcard-opp.fcard-def { transform: rotate(270deg) scale(0.74); }

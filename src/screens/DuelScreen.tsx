@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { OcgMessageType as T, OcgResponseType as R } from "ocgcore-wasm";
 import type { OcgLocation, OcgResponse } from "ocgcore-wasm";
 import { DuelController } from "../engine/controller";
+import type { Fx } from "../engine/controller";
 import type { DuelMode } from "../engine/controller";
 import type { DeckList, FieldCard } from "../engine/protocol";
 import { LOC, PHASE } from "../lib/constants";
@@ -159,6 +160,24 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
   const waitingAi = !prompt && !view.end;
   const myTurn = state.turnPlayer === viewer;
 
+  // Animations localisées sur les zones du terrain
+  const zoneFx = new Map<string, { cls: string; code: number; id: number }[]>();
+  const pushZoneFx = (key: string, cls: string, code: number, id: number) => zoneFx.set(key, [...(zoneFx.get(key) ?? []), { cls, code, id }]);
+  for (const f of view.fx) {
+    if (f.kind === "summon" || f.kind === "spsummon" || f.kind === "flip" || f.kind === "set") pushZoneFx(f.key, `fx-${f.kind}`, f.code, f.id);
+    else if (f.kind === "leave") pushZoneFx(f.key, "fx-leave", f.code, f.id);
+    else if (f.kind === "attack") {
+      pushZoneFx(f.from, f.player === viewer ? "fx-lunge-up" : "fx-lunge-down", 0, f.id);
+      if (f.to) pushZoneFx(f.to, "fx-hit", 0, f.id);
+    }
+  }
+  const chainAt = new Map<string, number>();
+  state.chain.forEach((c, i) => {
+    if (c.location & (LOC.MZONE | LOC.SZONE)) chainAt.set(cardKey(c.controller, c.location, c.sequence), i + 1);
+  });
+  const side = (player: number) => (player === viewer || mode === "solo" ? "me" : "op");
+  const directHit = view.fx.find((f) => f.kind === "attack" && !f.to);
+
   return (
     <div className="duel">
       <div className="duel-top">
@@ -167,7 +186,8 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
           <button className="tool" onClick={() => setShowLog(!showLog)} title="Journal">☰</button>
         </div>
         {handFor(1 - viewer, op.hand, true)}
-        <LpPlate name={label(1 - viewer)} lp={op.lp} active={!myTurn} side="op" />
+        <LpPlate name={label(1 - viewer)} lp={op.lp} active={!myTurn} side="op" thinking={view.thinking} />
+        <DamagePops fx={view.fx} player={1 - viewer} />
       </div>
 
       <div className="duel-board">
@@ -182,7 +202,10 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
           onCard={onCard}
           onZone={onZone}
           onPile={(player, location) => location !== LOC.DECK && setPile({ player, location })}
+          zoneFx={zoneFx}
+          chainAt={chainAt}
         />
+        {directHit && <div key={directHit.id} className={`direct-hit ${directHit.kind === "attack" && directHit.player === viewer ? "to-op" : "to-me"}`} />}
         {state.chain.length > 0 && (
           <div className="chain">
             <div className="chain-title">Chaîne</div>
@@ -196,7 +219,41 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
             ))}
           </div>
         )}
-        {view.flash && <Flash key={view.flash.id} code={view.flash.code} text={view.flash.text} />}
+        {view.fx.map((f) => {
+          if (f.kind === "activate")
+            return (
+              <div key={f.id} className={`fx-activate from-${side(f.player)}`}>
+                <div className="fx-activate-card">
+                  <CardImage code={f.code} big />
+                  <span className="chain-num">{f.chain}</span>
+                </div>
+              </div>
+            );
+          if (f.kind === "banner")
+            return <div key={f.id} className={`fx-banner side-${side(f.player)} ${f.big ? "big" : ""}`}><span>{f.text}</span></div>;
+          if (f.kind === "chain")
+            return (
+              <div key={f.id} className="fx-chain">
+                {f.links.map((l, i) => (
+                  <div key={i} className={`fx-chain-card c${i} side-${side(l.player)}`}>
+                    <CardImage code={l.code} />
+                    <b>{f.size - f.links.length + i + 1}</b>
+                  </div>
+                ))}
+                <span className="fx-chain-text">Chaîne</span>
+              </div>
+            );
+          if (f.kind === "resolve") return <div key={f.id} className="fx-resolve"><span>Résolution</span></div>;
+          return null;
+        })}
+        <PhaseOrb
+          turn={state.turn}
+          phase={state.phase}
+          mine={myTurn}
+          waiting={waitingAi && mode === "ai"}
+          buttons={phaseButtons}
+          onPick={(r) => respond(r)}
+        />
         {(msg?.type === T.SELECT_PLACE || msg?.type === T.SELECT_DISFIELD) && (
           <div className="banner">{prompt?.hint || "Choisissez une zone"} ({chosenZones.length}/{msg.count})</div>
         )}
@@ -205,16 +262,8 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
       <div className="duel-bottom">
         {handFor(viewer, me.hand, false)}
         <LpPlate name={label(viewer)} lp={me.lp} active={myTurn} side="me" />
+        <DamagePops fx={view.fx} player={viewer} />
       </div>
-
-      <PhaseOrb
-        turn={state.turn}
-        phase={state.phase}
-        mine={myTurn}
-        waiting={waitingAi && mode === "ai"}
-        buttons={phaseButtons}
-        onPick={(r) => respond(r)}
-      />
 
       {view.clock !== null && prompt && (
         <div className={`clock ${view.clock <= 30 ? "low" : ""}`}>⏱ {Math.floor(view.clock / 60)}:{String(view.clock % 60).padStart(2, "0")}</div>
@@ -331,7 +380,7 @@ function actionKind(label: string): string {
   return "other";
 }
 
-function LpPlate({ name, lp, active, side }: { name: string; lp: number; active: boolean; side: "me" | "op" }) {
+function LpPlate({ name, lp, active, side, thinking }: { name: string; lp: number; active: boolean; side: "me" | "op"; thinking?: boolean }) {
   const [shown, setShown] = useState(lp);
   const [hit, setHit] = useState(0);
   // Les LP défilent jusqu'à la nouvelle valeur, comme dans Master Duel.
@@ -346,7 +395,7 @@ function LpPlate({ name, lp, active, side }: { name: string; lp: number; active:
     <div className={`lp-plate lp-${side} ${active ? "active" : ""}`}>
       <div className="avatar">{name.slice(0, 1).toUpperCase()}</div>
       <div className="lp-body">
-        <span className="pname">{name}</span>
+        <span className="pname">{name}{thinking && <span className="thinking-dots"> réfléchit<i>.</i><i>.</i><i>.</i></span>}</span>
         <span key={hit} className={`lp-value ${hit ? "lp-hit" : ""}`}><small>LP</small>{shown}</span>
         <span className="lp-bar"><span style={{ width: `${Math.max(0, Math.min(100, (shown / 8000) * 100))}%` }} /></span>
       </div>
@@ -355,8 +404,8 @@ function LpPlate({ name, lp, active, side }: { name: string; lp: number; active:
 }
 
 const PHASE_LABELS: [number, string][] = [
-  [PHASE.DRAW, "Draw"], [PHASE.STANDBY, "Standby"], [PHASE.MAIN1, "Main 1"], [0x8 | 0x10 | 0x20 | 0x40 | 0x80, "Battle"],
-  [PHASE.MAIN2, "Main 2"], [PHASE.END, "End"],
+  [PHASE.DRAW, "Draw"], [PHASE.STANDBY, "Standby"], [PHASE.MAIN1, "Main1"], [0x8 | 0x10 | 0x20 | 0x40 | 0x80, "Battle"],
+  [PHASE.MAIN2, "Main2"], [PHASE.END, "End"],
 ];
 
 function PhaseOrb({ turn, phase, mine, waiting, buttons, onPick }: {
@@ -384,18 +433,12 @@ function PhaseOrb({ turn, phase, mine, waiting, buttons, onPick }: {
   );
 }
 
-function Flash({ code, text }: { code: number; text: string }) {
-  const [on, setOn] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setOn(false), 900);
-    return () => clearTimeout(t);
-  }, []);
-  if (!on) return null;
+function DamagePops({ fx, player }: { fx: Fx[]; player: number }) {
   return (
-    <div className="flash">
-      <CardImage code={code} big />
-      <span>{text}</span>
-    </div>
+    <>
+      {fx.map((f) => f.kind === "damage" && f.player === player && (
+        <div key={f.id} className={`damage-pop ${f.heal ? "heal" : ""}`}>{f.heal ? "+" : "−"}{f.amount}</div>
+      ))}
+    </>
   );
 }
-

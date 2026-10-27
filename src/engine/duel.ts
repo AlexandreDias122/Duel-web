@@ -70,6 +70,22 @@ function autoResponse(prompt: OcgMessage): OcgResponse | null {
   return null;
 }
 
+/** Temps de réaction simulé de l'IA, seulement quand elle prend une vraie décision. */
+function thinkTime(prompt: OcgMessage, response: OcgResponse): number {
+  const jitter = (min: number, max: number) => Math.round(min + Math.random() * (max - min));
+  switch (prompt.type) {
+    case T.SELECT_IDLECMD: return jitter(900, 1700);
+    case T.SELECT_BATTLECMD: return jitter(700, 1300);
+    case T.SELECT_CHAIN:
+      if (!prompt.selects.length) return 0;
+      return (response as { index: number | null }).index === null ? jitter(300, 600) : jitter(800, 1400);
+    case T.SELECT_EFFECTYN: case T.SELECT_YESNO: case T.SELECT_OPTION: return jitter(500, 900);
+    case T.SELECT_CARD: case T.SELECT_UNSELECT_CARD: case T.SELECT_TRIBUTE: case T.SELECT_SUM: return jitter(600, 1100);
+    case T.SELECT_PLACE: case T.SELECT_POSITION: return jitter(250, 500);
+    default: return 0;
+  }
+}
+
 export class DuelEngine {
   private duel: OcgDuelHandle;
   private ai: BasicAi;
@@ -160,7 +176,10 @@ export class DuelEngine {
       this.emit({ kind: "update", state, messages: visible });
       const player = (prompt as { player?: number }).player ?? 0;
       if (this.setup.ai[player]) {
-        this.core.duelSetResponse(this.duel, this.ai.respond(prompt, state, isRetry));
+        const response = this.ai.respond(prompt, state, isRetry);
+        const ms = thinkTime(prompt, response);
+        if (ms) this.emit({ kind: "think", ms });
+        this.core.duelSetResponse(this.duel, response);
         isRetry = false;
         continue;
       }

@@ -19,6 +19,10 @@ export interface FieldProps {
   onCard: (controller: number, location: number, sequence: number, card: FieldCard) => void;
   onZone: (controller: number, location: number, sequence: number) => void;
   onPile: (controller: number, location: number) => void;
+  /** Animations en cours par zone (classe CSS + carte concernée). */
+  zoneFx: Map<string, { cls: string; code: number; id: number }[]>;
+  /** Numéro de maillon de chaîne par zone. */
+  chainAt: Map<string, number>;
 }
 
 export function Field(p: FieldProps) {
@@ -78,6 +82,8 @@ function Zone(p: FieldProps & { player: number; location: number; seq: number; e
   const selectable = p.zones.has(key);
   const chosen = p.chosenZones.has(key);
   const opp = p.player !== p.viewer;
+  const fx = p.zoneFx.get(key) ?? [];
+  const chainNum = p.chainAt.get(key);
   const cls = [
     "zone",
     p.location === LOC.MZONE ? "zone-m" : "zone-s",
@@ -88,10 +94,17 @@ function Zone(p: FieldProps & { player: number; location: number; seq: number; e
     card && p.actionable.has(key) ? "zone-actionable" : "",
     card && p.targets.has(key) ? "zone-target" : "",
     opp ? "zone-opp" : "",
+    ...fx.map((f) => f.cls),
   ].join(" ");
   return (
     <div className={cls} onClick={() => (selectable ? p.onZone(p.player, p.location, p.seq) : card && p.onCard(p.player, p.location, p.seq, card))}>
       {card && <FieldCardView card={card} opp={opp} reveal={!opp || p.revealAll} monsterZone={p.location === LOC.MZONE} />}
+      {fx.map((f) => (
+        <div key={f.id} className={`zfx ${f.cls}-layer`}>
+          {f.cls === "fx-leave" && f.code > 0 && <CardImage code={f.code} />}
+        </div>
+      ))}
+      {chainNum !== undefined && <div className="chain-badge">{chainNum}</div>}
     </div>
   );
 }
@@ -104,10 +117,11 @@ function FieldCardView({ card, opp, reveal, monsterZone }: { card: FieldCard; op
   const counters = Object.values(card.counters).reduce((a, b) => a + b, 0);
   return (
     <div className={`fcard ${defense ? "fcard-def" : ""} ${opp ? "fcard-opp" : ""}`}>
-      <CardImage code={card.code} art back={facedown && (!reveal || !card.code)} className={facedown ? "facedown" : ""} />
+      <CardImage code={card.code} back={facedown && (!reveal || !card.code)} className={facedown ? "facedown" : ""} />
       {isMonster && !facedown && card.position & POS.FACEUP && (
-        <div className={`stats ${card.attack > card.baseAttack ? "up" : card.attack < card.baseAttack ? "down" : ""}`}>
-          {card.attack}{!isLink && <span>/{card.defense}</span>}
+        <div className="stats">
+          <b className={card.attack > card.baseAttack ? "up" : card.attack < card.baseAttack ? "down" : ""}>{card.attack}</b>
+          {!isLink && <span className={card.defense > card.baseDefense ? "up" : card.defense < card.baseDefense ? "down" : ""}>/{card.defense}</span>}
         </div>
       )}
       {card.overlays.length > 0 && <div className="badge badge-xyz">{card.overlays.length}</div>}

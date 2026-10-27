@@ -79,4 +79,6 @@ export type FromWorker =
   | { kind: "update"; state: DuelState; messages: OcgMessage[] }
   | { kind: "prompt"; message: OcgMessage; hint: string; retry: boolean }
   | { kind: "end"; winner: number; reason: string }
+  /** L'IA réfléchit avant d'agir : l'interface marque une pause. */
+  | { kind: "think"; ms: number }
   | { kind: "error"; error: string };
