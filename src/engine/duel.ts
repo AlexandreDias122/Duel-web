@@ -48,23 +48,18 @@ function shuffle<T>(list: readonly T[], rng: () => number): T[] {
 
 /**
  * Questions qui n'appellent pas de vraie décision du joueur, comme dans Master Duel :
- * fenêtre de chaîne sans carte activable, et placement simple dans ses propres zones.
+ * fenêtre de chaîne sans carte activable, et placement quand une seule zone est libre.
  */
 function autoResponse(prompt: OcgMessage): OcgResponse | null {
   if (prompt.type === T.SELECT_CHAIN && prompt.selects.length === 0) return { type: OcgResponseType.SELECT_CHAIN, index: null };
   if (prompt.type === T.SELECT_PLACE && prompt.count === 1) {
     const free: number[] = [];
     for (let bit = 0; bit < 32; bit++) if (bit % 16 !== 7 && !(prompt.field_mask & (1 << bit))) free.push(bit);
-    // Zones Monstre Extra ou terrain adverse : le choix compte, on laisse le joueur décider.
-    if (!free.length || free.some((b) => b >= 16 || b === 5 || b === 6 || b === 13)) return null;
-    const monster = free.every((b) => b < 8);
-    const spell = free.every((b) => b >= 8 && b <= 12);
-    if (!monster && !spell) return null;
-    // Zone la plus centrale disponible
-    const bit = [...free].sort((a, b) => Math.abs((a % 8) - 2) - Math.abs((b % 8) - 2))[0];
+    if (free.length !== 1) return null;
+    const bit = free[0] % 16;
     return {
       type: OcgResponseType.SELECT_PLACE,
-      places: [{ player: prompt.player, location: (bit < 8 ? LOC.MZONE : LOC.SZONE) as OcgLocation, sequence: bit % 8 }],
+      places: [{ player: free[0] >= 16 ? 1 - prompt.player : prompt.player, location: (bit < 8 ? LOC.MZONE : LOC.SZONE) as OcgLocation, sequence: bit % 8 }],
     };
   }
   return null;

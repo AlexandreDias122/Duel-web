@@ -97,7 +97,7 @@ function Zone(p: FieldProps & { player: number; location: number; seq: number; e
     ...fx.map((f) => f.cls),
   ].join(" ");
   return (
-    <div className={cls} onClick={() => (selectable ? p.onZone(p.player, p.location, p.seq) : card && p.onCard(p.player, p.location, p.seq, card))}>
+    <div className={cls} data-zone={key} onClick={() => (selectable ? p.onZone(p.player, p.location, p.seq) : card && p.onCard(p.player, p.location, p.seq, card))}>
       {card && <FieldCardView card={card} opp={opp} reveal={!opp || p.revealAll} monsterZone={p.location === LOC.MZONE} />}
       {fx.map((f) => (
         <div key={f.id} className={`zfx ${f.cls}-layer`}>
@@ -140,7 +140,7 @@ function Pile(p: FieldProps & { player: number; location: number }) {
   const label = { [LOC.GRAVE]: "Cim.", [LOC.REMOVED]: "Bannis", [LOC.EXTRA]: "Extra", [LOC.DECK]: "Deck" }[p.location];
   const actionable = list?.some((_, i) => p.actionable.has(cardKey(p.player, p.location, i)));
   return (
-    <div className={`pile ${actionable ? "zone-actionable" : ""} ${p.player !== p.viewer ? "zone-opp" : ""}`} onClick={() => p.onPile(p.player, p.location)}>
+    <div className={`pile ${actionable ? "zone-actionable" : ""} ${p.player !== p.viewer ? "zone-opp" : ""}`} data-pile={`${p.player}-${p.location}`} onClick={() => p.onPile(p.player, p.location)}>
       <div className={`socket socket-${p.location === LOC.GRAVE ? "gy" : p.location === LOC.REMOVED ? "ban" : p.location === LOC.EXTRA ? "extra" : "deck"}`} />
       {count > 0 && <div className={`pile-stack ${faceUp ? "" : "pile-thick"}`}><CardImage code={top?.code ?? 0} art={faceUp} back={!faceUp && !(top && top.position & POS.FACEUP)} /></div>}
       <div className="pile-label">{label} <b>{count}</b></div>

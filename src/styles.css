@@ -836,3 +836,17 @@ select, input.search, .filters input {
 .duel-board .phase-menu { position: absolute; bottom: calc(100% + 8px); left: 50%; translate: -50% 0; z-index: 17; }
 .fcard-def { transform: rotate(90deg) scale(0.74); }
 .fcard-opp.fcard-def { transform: rotate(270deg) scale(0.74); }
+
+/* Carte qui glisse jusqu'au terrain */
+.fly-card { position: absolute; z-index: 30; pointer-events: none; left: -200px; top: 0; will-change: transform; }
+.fly-card .card-img { border-radius: 3px; box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6), 0 0 14px rgba(255, 230, 160, 0.6); }
+.fx-arrive .fcard { animation: arrive 0.6s steps(1, end); }
+@keyframes arrive { 0% { opacity: 0; } 100% { opacity: 1; } }
+
+/* Choix de la zone : cases disponibles bien visibles, le reste en retrait */
+.field:has(.zone-selectable) .zone:not(.zone-selectable)::before { filter: brightness(0.55) saturate(0.6); }
+.zone-selectable::after {
+  content: "▼"; inset: auto; border: none; transform: none; border-radius: 0; color: #fff; font-size: calc(var(--cw) * 0.32);
+  text-shadow: 0 0 8px #2bb7e8; animation: hop 0.8s infinite alternate ease-in-out;
+}
+@keyframes hop { from { translate: 0 -4px; } to { translate: 0 3px; } }

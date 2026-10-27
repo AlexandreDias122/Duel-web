@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { OcgMessageType as T, OcgResponseType as R } from "ocgcore-wasm";
 import type { OcgLocation, OcgResponse } from "ocgcore-wasm";
 import { DuelController } from "../engine/controller";
@@ -134,7 +134,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
   const handFor = (player: number, cards: FieldCard[], top: boolean) => {
     const visible = !top || mode === "solo";
     return (
-      <div className={`hand ${top ? "hand-top" : ""}`}>
+      <div className={`hand ${top ? "hand-top" : ""}`} data-hand={player}>
         {cards.map((c, i) => {
           const key = cardKey(player, LOC.HAND, i);
           const act = actions.has(key);
@@ -166,6 +166,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
   for (const f of view.fx) {
     if (f.kind === "summon" || f.kind === "spsummon" || f.kind === "flip" || f.kind === "set") pushZoneFx(f.key, `fx-${f.kind}`, f.code, f.id);
     else if (f.kind === "leave") pushZoneFx(f.key, "fx-leave", f.code, f.id);
+    else if (f.kind === "fly") pushZoneFx(f.to, "fx-arrive", 0, f.id);
     else if (f.kind === "attack") {
       pushZoneFx(f.from, f.player === viewer ? "fx-lunge-up" : "fx-lunge-down", 0, f.id);
       if (f.to) pushZoneFx(f.to, "fx-hit", 0, f.id);
@@ -243,6 +244,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
                 <span className="fx-chain-text">Chaîne</span>
               </div>
             );
+          if (f.kind === "fly") return <FlyCard key={f.id} fx={f} reveal={!f.faceDown || (f.player === viewer && mode === "ai") || mode === "solo"} />;
           if (f.kind === "resolve") return <div key={f.id} className="fx-resolve"><span>Résolution</span></div>;
           return null;
         })}
@@ -429,6 +431,52 @@ function PhaseOrb({ turn, phase, mine, waiting, buttons, onPick }: {
         <small>Tour {turn}</small>
         <b>{label}</b>
       </button>
+    </div>
+  );
+}
+
+/** Carte qui glisse de sa pile d'origine (main, deck…) jusqu'à la zone visée. */
+function FlyCard({ fx, reveal }: { fx: Extract<Fx, { kind: "fly" }>; reveal: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const target = document.querySelector(`[data-zone="${fx.to}"]`);
+    const source = fx.from & LOC.HAND
+      ? document.querySelector(`[data-hand="${fx.player}"]`)
+      : document.querySelector(`[data-pile="${fx.player}-${fx.from & LOC.REMOVED ? LOC.REMOVED : fx.from & LOC.GRAVE ? LOC.GRAVE : fx.from & LOC.EXTRA ? LOC.EXTRA : LOC.DECK}"]`);
+    if (!el || !target || !source) return;
+    // Coordonnées relatives au plateau (qui sert de repère à la carte volante)
+    const box = el.parentElement!.getBoundingClientRect();
+    const tr = target.getBoundingClientRect();
+    const sr = source.getBoundingClientRect();
+    const t = { left: tr.left - box.left, top: tr.top - box.top, width: tr.width, height: tr.height };
+    const s = { left: sr.left - box.left, top: sr.top - box.top, width: sr.width, height: sr.height };
+    if (fx.from & LOC.HAND) {
+      // Position de la carte dans la main avant son départ (la main compte une carte de plus).
+      const count = source.children.length + 1;
+      const slot = sr.width / count;
+      s.left += slot * Math.min(fx.seq, count - 1);
+      s.width = slot;
+    }
+    const w = t.width * 0.82;
+    el.style.width = `${w}px`;
+    el.style.left = `${t.left + (t.width - w) / 2}px`;
+    el.style.top = `${t.top + (t.height - w * 1.46) / 2}px`;
+    const dx = s.left + s.width / 2 - (t.left + t.width / 2);
+    const dy = s.top + s.height / 2 - (t.top + t.height / 2);
+    const fromScale = fx.from & LOC.HAND ? 1.6 : 1;
+    el.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(${fromScale})`, opacity: 0.9 },
+        { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 30}px) scale(${(fromScale + 1.25) / 2}) rotateX(18deg)`, opacity: 1, offset: 0.55 },
+        { transform: "translate(0, 0) scale(1)", opacity: 1 },
+      ],
+      { duration: 480, easing: "cubic-bezier(0.25, 0.8, 0.3, 1)", fill: "forwards" },
+    ).onfinish = () => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, fill: "forwards" });
+  }, [fx]);
+  return (
+    <div ref={ref} className="fly-card">
+      <CardImage code={fx.code} back={!reveal || !fx.code} />
     </div>
   );
 }

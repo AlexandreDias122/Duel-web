@@ -3,7 +3,7 @@
 import { OcgMessageType as T } from "ocgcore-wasm";
 import type { OcgMessage, OcgResponse } from "ocgcore-wasm";
 import type { CardDb } from "../lib/cards";
-import { LOC, PHASE, PHASE_NAMES } from "../lib/constants";
+import { LOC, PHASE, PHASE_NAMES, POS } from "../lib/constants";
 import { cardKey } from "../ui/keys";
 import type { DeckList, DuelState, FromWorker, FromWorkerTagged, ToWorker } from "./protocol";
 
@@ -24,11 +24,13 @@ export type Fx = { id: number } & (
   | { kind: "attack"; from: string; to: string | null; player: number }
   | { kind: "damage"; player: number; amount: number; heal: boolean }
   | { kind: "leave"; code: number; key: string }
+  /** Carte qui glisse d'une pile (main, deck, Extra Deck…) jusqu'à sa zone. */
+  | { kind: "fly"; code: number; player: number; from: number; seq: number; to: string; faceDown: boolean }
 );
 type FxInput = Fx extends infer F ? (F extends Fx ? Omit<F, "id"> : never) : never;
 
 const FX_LIFETIME: Record<Fx["kind"], number> = {
-  activate: 1100, summon: 900, spsummon: 1100, flip: 800, set: 600, banner: 1200, chain: 1300, resolve: 900, attack: 900, damage: 1300, leave: 700,
+  activate: 1100, summon: 900, spsummon: 1100, flip: 800, set: 600, banner: 1200, chain: 1300, resolve: 900, attack: 900, damage: 1300, leave: 700, fly: 700,
 };
 
 export interface DuelView {
@@ -233,6 +235,11 @@ export class DuelController {
       case T.DAMAGE: case T.PAY_LPCOST: return msg.amount ? [{ kind: "damage", player: msg.player, amount: msg.amount, heal: false }] : [];
       case T.RECOVER: return msg.amount ? [{ kind: "damage", player: msg.player, amount: msg.amount, heal: true }] : [];
       case T.MOVE:
+        if (isArrival(msg))
+          return [{
+            kind: "fly", code: msg.card, player: msg.from.controller, from: msg.from.location, seq: msg.from.sequence,
+            to: cardKey(msg.to.controller, msg.to.location, msg.to.sequence), faceDown: (msg.to.position & POS.FACEDOWN) !== 0,
+          }];
         if (msg.from.location & (LOC.MZONE | LOC.SZONE) && msg.to.location & (LOC.GRAVE | LOC.REMOVED) && msg.card)
           return [{ kind: "leave", code: msg.card, key: cardKey(msg.from.controller, msg.from.location, msg.from.sequence) }];
         return [];
@@ -275,6 +282,13 @@ export class DuelController {
   }
 }
 
+/** Une carte arrive sur le terrain depuis la main, le deck, l'Extra Deck, le Cimetière ou les bannies. */
+function isArrival(msg: Extract<OcgMessage, { type: T.MOVE }>) {
+  return (msg.to.location & (LOC.MZONE | LOC.SZONE)) !== 0
+    && (msg.from.location & (LOC.HAND | LOC.DECK | LOC.EXTRA | LOC.GRAVE | LOC.REMOVED)) !== 0
+    && !(msg.to.location & LOC.OVERLAY);
+}
+
 const PHASE_BANNERS: [number, string][] = [
   [PHASE.DRAW, "Phase de Pioche"], [PHASE.STANDBY, "Phase de Préparation"], [PHASE.MAIN1, "Phase Principale 1"],
   [PHASE.BATTLE_START, "Phase de Combat"], [PHASE.MAIN2, "Phase Principale 2"], [PHASE.END, "Phase Finale"],
@@ -292,7 +306,7 @@ function pauseFor(msg: OcgMessage, state: DuelState): number {
     case T.ATTACK: return 750;
     case T.BATTLE: return 350;
     case T.DAMAGE: case T.RECOVER: case T.PAY_LPCOST: return 650;
-    case T.MOVE: return msg.from.location & (LOC.MZONE | LOC.SZONE) && msg.to.location & (LOC.GRAVE | LOC.REMOVED) ? 450 : 200;
+    case T.MOVE: return isArrival(msg) ? 520 : msg.from.location & (LOC.MZONE | LOC.SZONE) && msg.to.location & (LOC.GRAVE | LOC.REMOVED) ? 450 : 200;
     case T.SET: return 400;
     case T.POS_CHANGE: return 300;
     case T.DRAW: return 300;
