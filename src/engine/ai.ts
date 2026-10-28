@@ -16,6 +16,8 @@ type Intent = "good" | "bad" | "material" | "attack" | "target";
 
 const BAD_HINTS = new Set([500, 501, 502, 503, 504, 505, 507, 515, 519, 520, 521, 528, 531, 532, 575, 579]);
 const MATERIAL_HINTS = new Set([511, 512, 513, 533]);
+/** Ajouter à la main, Invoquer, poser : là où le profil dit quoi aller chercher. */
+const FETCH_HINTS = new Set([506, 509, 510, 527]);
 
 function intentOf(hint: bigint): Intent {
   const h = Number(hint);
@@ -44,6 +46,8 @@ export class DuelAi {
   private fetched = new Map<number, number>();
   /** Cartes adverses vues, pour les déclarations de nom. */
   private seen: number[] = [];
+  /** Indice (HINTMSG_*) de la sélection en cours. */
+  private hint = 0;
   private rankOf: (list: number[] | undefined, code: number) => number;
 
   constructor(private db: CardDb, readonly player: number, private profile: DeckProfile | null = null) {
@@ -89,6 +93,7 @@ export class DuelAi {
       this.holdAttack.clear();
       this.fetched.clear();
     }
+    this.hint = Number(hint);
     // Après un refus du moteur, on se rabat sur la réponse la plus sûre.
     if (retry) return safeResponse(msg);
     switch (msg.type) {
@@ -144,9 +149,10 @@ export class DuelAi {
     };
     if (++this.idleActions > 45) return done();
     const p = this.profile;
-    const planScore = (code: number, base: number) => {
+    // Le plan du deck ne remplace pas le bon sens : il départage et avance les cartes prévues.
+    const planBonus = (code: number) => {
       const i = this.rankOf(p?.plan, code);
-      return i >= 0 ? base - i * 5 : -1;
+      return i >= 0 ? 120 - i * 4 : -1;
     };
 
     const options: { action: number; index: number; score: number; key?: string; extra?: boolean }[] = [];
@@ -155,7 +161,7 @@ export class DuelAi {
       const card = this.db.get(c.code);
       const key = `${c.code}:${c.description}`;
       if ((this.used.get(key) ?? 0) >= 3) return;
-      const planned = planScore(c.code, 900);
+      const planned = planBonus(c.code);
       // Les hand traps, les cartes de réponse et les Pièges posés attendent le tour adverse.
       if (planned < 0) {
         if (c.location === LOC.HAND && handTrapKind(card)) return;
@@ -167,15 +173,14 @@ export class DuelAi {
       if (c.location === LOC.HAND && card && card.type & TYPE.FIELD && me.szone[5] && !(me.szone[5].position & POS.FACEDOWN)) return;
       // Effets rapides des monstres (sans effet de Main Phase) : gardés pour le tour adverse.
       if (planned < 0 && c.location & LOC.MZONE && quickOnly(card)) return;
-      let score = planned;
-      if (score < 0) {
-        if (c.location & LOC.MZONE) score = 760; // effets des monstres avant de s'en servir comme Matériel
-        else if (c.location & LOC.GRAVE) score = 720;
-        else if (card && card.type & TYPE.FIELD) score = 560;
-        else if (isSearcher(card)) score = 540;
-        else if (card && card.type & TYPE.PENDULUM && c.location === LOC.HAND) score = 300;
-        else score = 500;
-      }
+      let score: number;
+      if (c.location & LOC.MZONE) score = 760; // effets des monstres avant de s'en servir comme Matériel
+      else if (c.location & LOC.GRAVE) score = 720;
+      else if (card && card.type & TYPE.FIELD) score = 560;
+      else if (isSearcher(card)) score = 540;
+      else if (card && card.type & TYPE.PENDULUM && c.location === LOC.HAND) score = 300;
+      else score = 500;
+      score += Math.max(planned, 0);
       options.push({ action: 5, index, score, key });
     });
 
@@ -184,7 +189,7 @@ export class DuelAi {
       if (handTrapKind(card)) return;
       const i = this.rankOf(p?.normal, c.code);
       let score: number;
-      if (i >= 0) score = 880 - i * 5;
+      if (i >= 0) score = 600 - i * 5;
       else if (card && card.level >= 5) score = card.atk >= 2400 ? 260 : -1; // Invocation Sacrifice : seulement pour un gros monstre
       else score = (hasSummonTrigger(card) ? 480 : 400) + (card?.atk ?? 0) / 100;
       if (score > 0) options.push({ action: 0, index, score });
@@ -192,17 +197,18 @@ export class DuelAi {
 
     msg.special_summons.forEach((c, index) => {
       const card = this.db.get(c.code);
-      if (c.location === LOC.HAND && handTrapKind(card) && planScore(c.code, 1) < 0) return;
-      const planned = planScore(c.code, 870);
+      const planned = planBonus(c.code);
+      if (c.location === LOC.HAND && handTrapKind(card) && planned < 0) return;
       let score: number;
       if (c.location & LOC.EXTRA) {
         if (this.extraSummons >= 10) return;
         const i = this.rankOf(p?.extraPlan, c.code);
-        if (i >= 0) score = 700 - i * 8;
+        // Après les effets et les recherches : on invoque depuis l'Extra Deck une fois la main exploitée.
+        if (i >= 0) score = 440 + Math.max(0, 60 - i * 4);
         else if (p) return; // avec un profil, on s'en tient aux monstres prévus
         // Sans profil : on évite de transformer de bons monstres en petits Liens.
         else score = (card?.atk ?? 0) >= 1800 ? 300 + (card?.atk ?? 0) / 20 : -1;
-      } else score = planned >= 0 ? planned : 620 + (card?.atk ?? 0) / 100;
+      } else score = 620 + (card?.atk ?? 0) / 100 + Math.max(planned, 0);
       if (score > 0) options.push({ action: 1, index, score, extra: (c.location & LOC.EXTRA) !== 0 });
     });
 
@@ -373,9 +379,14 @@ export class DuelAi {
     const p = this.profile;
     const fromExtra = (c.location & LOC.EXTRA) !== 0 || (card && isExtra(card));
     let s = (card?.atk ?? 0) / 100;
-    const i = this.rankOf(fromExtra ? p?.extraPlan : p?.search, c.code);
-    if (i >= 0) s += 1000 - i * 20;
-    else if (this.rankOf(p?.plan, c.code) >= 0) s += 500;
+    // Le profil ne s'applique qu'aux cartes qu'on va chercher (ajout à la main, Invocation, pose).
+    // Il départage seulement : les duels IA contre IA montrent qu'un ordre imposé fait moins bien
+    // que le bon sens général (pas de doublon, effets à l'Invocation, hand traps).
+    if (c.location & (LOC.DECK | LOC.GRAVE | LOC.REMOVED | LOC.EXTRA) && FETCH_HINTS.has(this.hint)) {
+      const i = this.rankOf(fromExtra ? p?.extraPlan : p?.search, c.code);
+      if (i >= 0) s += 60 - i * 3;
+      else if (this.rankOf(p?.plan, c.code) >= 0) s += 20;
+    }
     if (hasSummonTrigger(card) || isSearcher(card)) s += 60;
     if (c.location & (LOC.DECK | LOC.GRAVE)) {
       // Éviter les doublons en main ou déjà en jeu.

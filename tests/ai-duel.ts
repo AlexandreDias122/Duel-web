@@ -36,7 +36,9 @@ for (const d of AI_DECKS) {
 
 type Entry = { name: string; list: DeckList };
 const pairs: [Entry, Entry][] = [];
-const meta = AI_DECKS.map((d): Entry => ({ name: d.name, list: { main: d.main, extra: d.extra, profile: d.id } }));
+// DECKS=toon,branded : limiter aux decks méta voulus.
+const only = process.env.DECKS?.split(",");
+const meta = AI_DECKS.filter((d) => !only || only.includes(d.id)).map((d): Entry => ({ name: d.name, list: { main: d.main, extra: d.extra, profile: d.id } }));
 for (let i = 0; i < n; i++) {
   if (mode === "meta") {
     const k = meta.length;
