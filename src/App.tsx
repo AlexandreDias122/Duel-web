@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import type { CardDb } from "./lib/cards";
 import { cardImageSources, loadCardDb } from "./lib/cards";
-import type { Banlist, Deck } from "./lib/deck";
-import { loadDecks, saveDecks } from "./lib/deck";
+import type { Banlist } from "./lib/deck";
+import { useDeckStore } from "./lib/useDeckStore";
+import type { Account } from "./lib/useDeckStore";
+import { AccountScreen, ImportBanner } from "./screens/AccountScreen";
 import { DbContext } from "./ui/dbContext";
 import { DeckEditor } from "./screens/DeckEditor";
 import { DecksScreen } from "./screens/DecksScreen";
@@ -16,6 +18,7 @@ import { warmupEngine } from "./engine/controller";
 type Route =
   | { name: "home" }
   | { name: "decks" }
+  | { name: "account" }
   | { name: "editor"; id: string }
   | { name: "setup"; mode: DuelMode }
   | { name: "duel"; config: DuelConfig; round: number };
@@ -26,7 +29,12 @@ export default function App() {
   const [data, setData] = useState<{ db: CardDb; banlists: Banlist[]; starters: StarterDeck[] } | null>(null);
   const [error, setError] = useState("");
   const [route, setRoute] = useState<Route>({ name: "home" });
-  const [decks, setDecks] = useState<Deck[]>(loadDecks);
+  const { decks, saveDeck, deleteDeck, account } = useDeckStore();
+
+  // Lien « mot de passe oublié » ouvert : on affiche directement le formulaire.
+  useEffect(() => {
+    if (account.recovery) setRoute({ name: "account" });
+  }, [account.recovery]);
 
   useEffect(() => {
     Promise.all([
@@ -40,12 +48,6 @@ export default function App() {
       })
       .catch((e) => setError(String(e)));
   }, []);
-
-  const updateDecks = (next: Deck[]) => {
-    setDecks(next);
-    saveDecks(next);
-  };
-  const saveDeck = (d: Deck) => updateDecks(decks.some((x) => x.id === d.id) ? decks.map((x) => (x.id === d.id ? d : x)) : [...decks, d]);
 
   if (error) return <div className="screen center"><h2>Chargement impossible</h2><p className="error">{error}</p></div>;
   if (!data) {
@@ -61,23 +63,25 @@ export default function App() {
   let content;
   switch (route.name) {
     case "home":
-      content = <Home go={setRoute} deckCount={decks.length} />;
+      content = <Home go={setRoute} deckCount={decks.length} account={account} />;
       break;
     case "decks":
       content = (
         <DecksScreen decks={decks} starters={data.starters} onBack={() => setRoute({ name: "home" })}
-          onOpen={(id) => setRoute({ name: "editor", id })}
-          onSave={(d) => setDecks((prev) => { const next = [...prev.filter((x) => x.id !== d.id), d]; saveDecks(next); return next; })}
-          onDelete={(id) => updateDecks(decks.filter((d) => d.id !== id))} />
+          onOpen={(id) => setRoute({ name: "editor", id })} onSave={saveDeck} onDelete={deleteDeck}
+          notice={<ImportBanner account={account} />} />
       );
       break;
     case "editor": {
       const deck = decks.find((d) => d.id === route.id);
       content = deck
         ? <DeckEditor deck={deck} onChange={saveDeck} onBack={() => setRoute({ name: "decks" })} />
-        : <DecksScreen decks={decks} starters={data.starters} onBack={() => setRoute({ name: "home" })} onOpen={(id) => setRoute({ name: "editor", id })} onSave={saveDeck} onDelete={(id) => updateDecks(decks.filter((d) => d.id !== id))} />;
+        : <DecksScreen decks={decks} starters={data.starters} onBack={() => setRoute({ name: "home" })} onOpen={(id) => setRoute({ name: "editor", id })} onSave={saveDeck} onDelete={deleteDeck} />;
       break;
     }
+    case "account":
+      content = <AccountScreen account={account} deckCount={decks.length} onBack={() => setRoute({ name: "home" })} />;
+      break;
     case "setup":
       content = <DuelSetup mode={route.mode} decks={decks} starters={data.starters} onBack={() => setRoute({ name: "home" })}
         onStart={(config) => setRoute({ name: "duel", config, round: 1 })} />;
@@ -96,7 +100,7 @@ export default function App() {
 
 const HERO_CARDS = [89631139, 46986414, 74677422, 70095154, 44508094, 10000020];
 
-function Home({ go, deckCount }: { go: (r: Route) => void; deckCount: number }) {
+function Home({ go, deckCount, account }: { go: (r: Route) => void; deckCount: number; account: Account }) {
   const [active, setActive] = useState(0);
   const [hero] = useState(() => HERO_CARDS[Math.floor(Math.random() * HERO_CARDS.length)]);
   const [heroOk, setHeroOk] = useState(true);
@@ -104,6 +108,9 @@ function Home({ go, deckCount }: { go: (r: Route) => void; deckCount: number }) 
     { label: "SOLO", sub: "Duel contre l'IA", route: { name: "setup", mode: "ai" } },
     { label: "DUEL LIBRE", sub: "Jouez les deux côtés", route: { name: "setup", mode: "solo" } },
     { label: "DECK", sub: `${deckCount} deck(s) · éditeur`, route: { name: "decks" } },
+    ...(account.enabled
+      ? [{ label: "COMPTE", sub: account.user ? account.user.email : "Se connecter pour garder ses decks", route: { name: "account" } as Route }]
+      : []),
   ];
   return (
     <div className="home">

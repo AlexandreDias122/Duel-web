@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import type { Deck } from "../lib/deck";
 import { newId, parseYdk, parseYdke } from "../lib/deck";
@@ -16,9 +17,10 @@ interface Props {
   onSave: (d: Deck) => void;
   onDelete: (id: string) => void;
   onBack: () => void;
+  notice?: ReactNode;
 }
 
-export function DecksScreen({ decks, starters, onOpen, onSave, onDelete, onBack }: Props) {
+export function DecksScreen({ decks, starters, onOpen, onSave, onDelete, onBack, notice }: Props) {
   const db = useDb();
   const file = useRef<HTMLInputElement>(null);
   const [ydke, setYdke] = useState("");
@@ -51,6 +53,7 @@ export function DecksScreen({ decks, starters, onOpen, onSave, onDelete, onBack 
         <button className="ghost" onClick={onBack}>‹</button>
         <h2>Mes decks</h2>
       </header>
+      {notice}
       <div className="row-actions">
         <button className="primary" onClick={() => onOpen(create("Nouveau deck").id)}>+ Nouveau deck</button>
         <button onClick={() => file.current?.click()}>Importer un .ydk</button>
