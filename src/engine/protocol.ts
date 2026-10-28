@@ -4,6 +4,8 @@ import type { OcgMessage, OcgResponse } from "ocgcore-wasm";
 export interface DeckList {
   main: number[];
   extra: number[];
+  /** Profil de jeu de l'IA pour ce deck (decks méta), voir aiDecks.ts. */
+  profile?: string;
 }
 
 export interface FieldCard {

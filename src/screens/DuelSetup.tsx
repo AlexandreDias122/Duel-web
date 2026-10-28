@@ -3,6 +3,7 @@ import type { DuelMode } from "../engine/controller";
 import type { DeckList } from "../engine/protocol";
 import type { Deck } from "../lib/deck";
 import { adaptToBanlist, parseYdk, validateDeck } from "../lib/deck";
+import { AI_DECKS } from "../engine/aiDecks";
 import { useBanlists, useDb } from "../ui/dbContext";
 import type { StarterDeck } from "./DecksScreen";
 
@@ -38,6 +39,9 @@ interface Props {
 interface Option {
   key: string;
   name: string;
+  /** Nom court affiché pour l'IA. */
+  label: string;
+  group: "mine" | "meta" | "starter";
   list: DeckList;
   errors: string[];
   note?: string[];
@@ -50,17 +54,25 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
   const [banlistName, setBanlistName] = useState(saved.banlist ?? banlists[0]?.name ?? "");
   const [timer, setTimer] = useState(saved.timer ?? 180);
   const banlist = banlists.find((b) => b.name === banlistName) ?? null;
+  // Les decks de démarrage et méta sont ajustés à la banlist choisie (cartes interdites remplacées).
+  const adapted = (lists: { main: number[]; extra: number[] }) => {
+    const l = adaptToBanlist(db, lists, banlist);
+    return { main: l.main, extra: l.extra, note: l.removed.length ? [`Adapté à la banlist : ${l.removed.join(", ")} remplacé(s)`] : [] };
+  };
   const options: Option[] = [
-    ...decks.map((d) => ({ key: `d:${d.id}`, name: d.name, list: { main: d.main, extra: d.extra }, errors: validateDeck(db, d, banlist) })),
-    ...starters.map((s) => {
-      // Les decks de démarrage sont ajustés à la banlist choisie (cartes interdites remplacées).
-      const l = adaptToBanlist(db, parseYdk(s.ydk), banlist);
-      const note = l.removed.length ? [`Adapté à la banlist : ${l.removed.join(", ")} remplacé(s)`] : [];
-      return { key: `s:${s.name}`, name: `${s.name} (démarrage)`, list: { main: l.main, extra: l.extra }, errors: [], note };
+    ...decks.map((d): Option => ({ key: `d:${d.id}`, name: d.name, label: d.name, group: "mine", list: { main: d.main, extra: d.extra }, errors: validateDeck(db, d, banlist) })),
+    ...AI_DECKS.map((m): Option => {
+      const l = adapted(m);
+      return { key: `m:${m.id}`, name: m.name, label: m.name, group: "meta", list: { main: l.main, extra: l.extra, profile: m.id }, errors: [], note: [m.blurb, ...l.note] };
+    }),
+    ...starters.map((s): Option => {
+      const l = adapted(parseYdk(s.ydk));
+      return { key: `s:${s.name}`, name: `${s.name} (démarrage)`, label: s.name, group: "starter", list: { main: l.main, extra: l.extra }, errors: [], note: l.note };
     }),
   ];
   const [mine, setMine] = useState(options[0]?.key ?? "");
-  const [theirs, setTheirs] = useState(options[Math.min(1, options.length - 1)]?.key ?? "");
+  // Contre l'IA, on propose d'emblée un deck méta : c'est là qu'elle joue le mieux.
+  const [theirs, setTheirs] = useState((mode === "ai" ? options.find((o) => o.group === "meta") : options[1])?.key ?? options[0]?.key ?? "");
   const [first, setFirst] = useState<"random" | "me" | "them">("random");
   const a = options.find((o) => o.key === mine);
   const b = options.find((o) => o.key === theirs);
@@ -78,7 +90,7 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
       // Le moteur fait toujours commencer l'équipe 0 : on place l'humain en conséquence.
       const human = meFirst ? 0 : 1;
       const decks: [DeckList, DeckList] = meFirst ? [a.list, b.list] : [b.list, a.list];
-      onStart({ mode, decks, human, turnSeconds, names: ["Vous", `IA (${b.name.replace(/ \(démarrage\)$/, "")})`] });
+      onStart({ mode, decks, human, turnSeconds, names: ["Vous", `IA (${b.label})`] });
     } else {
       onStart(meFirst
         ? { mode, decks: [a.list, b.list], human: 0, turnSeconds, names: ["Joueur 1", "Joueur 2"] }
@@ -96,18 +108,14 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
       </header>
       <p className="muted">
         {mode === "ai"
-          ? "Une IA basique joue l'autre deck. Idéal pour prendre en main l'appli."
+          ? "L'IA joue l'autre deck. Avec un deck méta, elle connaît ses combos et garde ses hand traps pour vos effets."
           : "Vous contrôlez les deux joueurs : parfait pour tester des combos et des interactions."}
       </p>
       <label className="field-label">{mode === "ai" ? "Votre deck" : "Deck du joueur 1"}</label>
-      <select value={mine} onChange={(e) => setMine(e.target.value)}>
-        {options.map((o) => <option key={o.key} value={o.key}>{o.name}</option>)}
-      </select>
+      <DeckSelect options={options} value={mine} onChange={setMine} />
       <DeckNotes o={a} />
       <label className="field-label">{mode === "ai" ? "Deck de l'IA" : "Deck du joueur 2"}</label>
-      <select value={theirs} onChange={(e) => setTheirs(e.target.value)}>
-        {options.map((o) => <option key={o.key} value={o.key}>{o.name}</option>)}
-      </select>
+      <DeckSelect options={options} value={theirs} onChange={setTheirs} />
       <DeckNotes o={b} />
       <label className="field-label">Qui commence ?</label>
       <div className="segmented">
@@ -129,6 +137,23 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
       {illegal && <div className="warn small">Un deck ne respecte pas la banlist ou les règles : corrigez-le dans l'éditeur ou choisissez « Aucune ».</div>}
       <button className="primary big" disabled={!a || !b || !a.list.main.length || !b.list.main.length || illegal} onClick={start}>Lancer le duel</button>
     </div>
+  );
+}
+
+const GROUPS: [Option["group"], string][] = [["mine", "Mes decks"], ["meta", "Decks méta (l'IA connaît leurs combos)"], ["starter", "Decks de démarrage"]];
+
+function DeckSelect({ options, value, onChange }: { options: Option[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)}>
+      {GROUPS.map(([g, label]) => {
+        const list = options.filter((o) => o.group === g);
+        return list.length ? (
+          <optgroup key={g} label={label}>
+            {list.map((o) => <option key={o.key} value={o.key}>{o.name}</option>)}
+          </optgroup>
+        ) : null;
+      })}
+    </select>
   );
 }
 
