@@ -3,7 +3,8 @@ import { OcgCoreInternal, OcgDuelMode, OcgMessageType as T, OcgProcessResult, Oc
 import type { OcgCoreSync, OcgDuelHandle, OcgLocation, OcgMessage, OcgResponse } from "ocgcore-wasm";
 import type { CardDb } from "../lib/cards";
 import { LOC, POS } from "../lib/constants";
-import { BasicAi, PROMPT_TYPES } from "./ai";
+import { DuelAi, PROMPT_TYPES } from "./ai";
+import { getProfile } from "./aiDecks";
 import type { DeckList, DuelState, FieldCard, FromWorker, PlayerState } from "./protocol";
 
 export interface DuelSetup {
@@ -83,7 +84,8 @@ function thinkTime(prompt: OcgMessage, response: OcgResponse): number {
 
 export class DuelEngine {
   private duel: OcgDuelHandle;
-  private ai: BasicAi;
+  /** Une IA par joueur (chacune avec le profil de son deck). */
+  private ai: [DuelAi, DuelAi];
   private lp: [number, number];
   private turn = 0;
   private turnPlayer = 0;
@@ -93,9 +95,11 @@ export class DuelEngine {
   private finished = false;
   /** Maillon en cours de résolution (0 si aucun). */
   private solving = 0;
+  private lastPrompt = "";
+  private repeats = 0;
 
   constructor(private core: OcgCoreSync, private db: CardDb, private setup: DuelSetup, private emit: (m: FromWorker) => void) {
-    this.ai = new BasicAi(db);
+    this.ai = [0, 1].map((p) => new DuelAi(db, p, getProfile(setup.decks[p].profile))) as [DuelAi, DuelAi];
     this.lp = [setup.lp, setup.lp];
     const team = { startingLP: setup.lp, startingDrawCount: 5, drawCountPerTurn: 1 };
     const duel = core.createDuel({
@@ -171,7 +175,13 @@ export class DuelEngine {
       this.emit({ kind: "update", state, messages: visible });
       const player = (prompt as { player?: number }).player ?? 0;
       if (this.setup.ai[player]) {
-        const response = this.ai.respond(prompt, state, isRetry);
+        // Le moteur repose sans cesse la même question : la réponse de l'IA ne convient pas, on passe à la plus sûre.
+        const sig = JSON.stringify(prompt, (_k, v) => (typeof v === "bigint" ? String(v) : v));
+        this.repeats = sig === this.lastPrompt ? this.repeats + 1 : 0;
+        this.lastPrompt = sig;
+        if (this.repeats > 12) isRetry = true;
+        const response = this.ai[player].respond(prompt, state, isRetry, this.hint[player]);
+        this.hint[player] = 0n;
         const ms = thinkTime(prompt, response);
         if (ms) this.emit({ kind: "think", ms });
         this.core.duelSetResponse(this.duel, response);
@@ -204,7 +214,10 @@ export class DuelEngine {
     if (p.type === T.SELECT_IDLECMD) r = { type: OcgResponseType.SELECT_IDLECMD, action: p.to_ep ? 7 : 6, index: null };
     else if (p.type === T.SELECT_BATTLECMD) r = { type: OcgResponseType.SELECT_BATTLECMD, action: p.to_ep ? 3 : 2, index: null };
     else if (p.type === T.SELECT_CHAIN && !p.forced) r = { type: OcgResponseType.SELECT_CHAIN, index: null };
-    else r = this.ai.respond(p, this.state(), false);
+    else {
+      const player = (p as { player?: number }).player ?? 0;
+      r = this.ai[player].respond(p, this.state(), false, this.hint[player]);
+    }
     this.respond(r);
   }
 
@@ -225,6 +238,8 @@ export class DuelEngine {
   }
 
   private track(m: OcgMessage) {
+    this.ai[0].observe(m);
+    this.ai[1].observe(m);
     switch (m.type) {
       case T.NEW_TURN: this.turn++; this.turnPlayer = m.player; break;
       case T.NEW_PHASE: this.phase = m.phase; break;

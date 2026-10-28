@@ -1,7 +1,7 @@
 # DuelWeb
 
 Yu-Gi-Oh! dans le navigateur, façon Master Duel / MDPro3 : toutes les cartes TCG et OCG,
-un éditeur de decks, des duels contre une IA basique ou contre soi-même. Rien à installer :
+un éditeur de decks, des duels contre une IA (avec des decks méta récents dont elle connaît les combos) ou contre soi-même. Rien à installer :
 sur iPhone, ouvrez le site dans Safari puis **Partager › Sur l'écran d'accueil**.
 
 ## Comment ça marche
@@ -27,6 +27,7 @@ npm install
 npm run data      # télécharge les dépôts Project Ignis dans .data/ et génère public/data + public/scripts
 npm run dev       # http://localhost:5173
 npm run test:ai   # duels IA contre IA en Node, pour vérifier moteur + IA
+npm run test:ai -- 21 meta    # decks méta entre eux ; « profil » : avec / sans profil de jeu
 npm run build
 ```
 
@@ -37,7 +38,9 @@ du dépôt, choisir **Settings › Pages › Source : GitHub Actions**.
 ## Structure
 
 - `src/engine/duel.ts` : pilotage du moteur (boucle, état du terrain, décodage des requêtes)
-- `src/engine/ai.ts` : IA basique (heuristiques)
+- `src/engine/ai.ts` : IA (hand traps, timing des chaînes, attaques rentables)
+- `src/engine/aiDecks.ts` : decks méta joués par l'IA et leur plan de jeu (quoi activer, chercher, invoquer)
+- `src/engine/cardKnowledge.ts` : hand traps et cartes de réponse connues
 - `src/engine/duel.worker.ts` / `controller.ts` : worker et pont vers l'interface
 - `src/screens/` : accueil, decks, éditeur, compte, préparation et écran de duel
 - `src/lib/cloud.ts` / `useDeckStore.ts` : comptes et synchronisation des decks
