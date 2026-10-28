@@ -328,6 +328,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
           respond={respond}
           inspect={(code) => setInspect({ code, actions: [] })}
           playerLabel={mode === "solo" && promptPlayer !== undefined ? label(promptPlayer) : ""}
+          respondingTo={state.chain[state.chain.length - 1]?.code}
         />
       )}
 

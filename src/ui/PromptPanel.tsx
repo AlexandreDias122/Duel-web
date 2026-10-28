@@ -12,10 +12,12 @@ interface Props {
   respond: (r: OcgResponse) => void;
   inspect: (code: number) => void;
   playerLabel: string;
+  /** Carte à laquelle on répond (dernier maillon de la chaîne), pour situer la question. */
+  respondingTo?: number;
 }
 
 /** Fenêtre de question pour tout ce qui ne se joue pas directement sur le terrain. */
-export function PromptPanel({ prompt, respond, inspect, playerLabel }: Props) {
+export function PromptPanel({ prompt, respond, inspect, playerLabel, respondingTo }: Props) {
   const [hidden, setHidden] = useState(false);
   const db = useDb();
   const m = prompt.message;
@@ -35,6 +37,9 @@ export function PromptPanel({ prompt, respond, inspect, playerLabel }: Props) {
           {playerLabel && <span className="tag">{playerLabel}</span>}
           <strong>{title}</strong>
           {prompt.retry && <div className="warn small">Choix refusé par le moteur, réessayez.</div>}
+          {m.type === T.SELECT_CHAIN && respondingTo ? (
+            <div className="muted small">En réponse à : <b>{db.get(respondingTo)?.name}</b></div>
+          ) : null}
         </div>
         <button className="ghost" onClick={() => setHidden(true)} title="Voir le terrain">▼</button>
       </div>
@@ -83,7 +88,7 @@ function renderBody(m: OcgMessage, respond: (r: OcgResponse) => void, inspect: (
               </button>
             ))}
           </div>
-          {!m.forced && <div className="sheet-actions"><button onClick={() => respond({ type: R.SELECT_CHAIN, index: null })}>Ne pas enchaîner</button></div>}
+          {!m.forced && <div className="sheet-actions"><button className="primary" onClick={() => respond({ type: R.SELECT_CHAIN, index: null })}>Ne pas activer</button></div>}
         </>
       );
     case T.SELECT_EFFECTYN:
