@@ -12,6 +12,7 @@
     "test:ai": "tsx tests/ai-duel.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
     "ocgcore-wasm": "^0.1.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

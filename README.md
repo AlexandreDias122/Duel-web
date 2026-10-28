@@ -14,9 +14,11 @@ sur iPhone, ouvrez le site dans Safari puis **Partager › Sur l'écran d'accuei
 | Banlists | [LFLists](https://github.com/ProjectIgnis/LFLists) (TCG et OCG) |
 | Textes de l'interface | `strings.conf` français de [Distribution](https://github.com/ProjectIgnis/Distribution) |
 | Images | YGOPRODeck, avec repli sur le serveur d'images de Project Ignis |
+| Comptes (facultatif) | [Supabase](https://supabase.com) pour retrouver ses decks sur plusieurs appareils, voir [`supabase/README.md`](supabase/README.md) |
 
 Tout tourne côté client : le site est 100 % statique (GitHub Pages) et fonctionne hors ligne
-une fois les données en cache (service worker).
+une fois les données en cache (service worker). Seule la sauvegarde des decks dans un compte
+passe par un serveur (Supabase) ; sans compte, tout reste sur l'appareil.
 
 ## Développement
 
@@ -37,7 +39,8 @@ du dépôt, choisir **Settings › Pages › Source : GitHub Actions**.
 - `src/engine/duel.ts` : pilotage du moteur (boucle, état du terrain, décodage des requêtes)
 - `src/engine/ai.ts` : IA basique (heuristiques)
 - `src/engine/duel.worker.ts` / `controller.ts` : worker et pont vers l'interface
-- `src/screens/` : accueil, decks, éditeur, préparation et écran de duel
+- `src/screens/` : accueil, decks, éditeur, compte, préparation et écran de duel
+- `src/lib/cloud.ts` / `useDeckStore.ts` : comptes et synchronisation des decks
 - `scripts/build-data.mjs` : génération des données statiques
 
 ## Licences

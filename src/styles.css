@@ -888,3 +888,22 @@ select, input.search, .filters input {
 .duel-wide .duel-bottom .lp-plate { left: 8px; bottom: 8px; }
 .duel-wide .duel-bottom .hand { translate: calc(var(--panel-w) / 2) 45%; }
 .duel-wide .chain { left: 6px; }
+
+/* ---------- Compte ---------- */
+.account-card, .import-banner {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px; margin-bottom: 12px;
+}
+.account-card b { font-size: 17px; word-break: break-all; }
+.import-banner { border-color: var(--gold2); }
+.import-banner .row-actions { margin: 6px 0 0; }
+.sync-status { font-size: 13px; }
+.sync-status::before { content: "●"; margin-right: 6px; }
+.sync-status.synced { color: var(--green); }
+.sync-status.syncing, .sync-status.offline { color: var(--gold); }
+.sync-status.error { color: var(--red); }
+.account-actions { display: flex; flex-direction: column; gap: 8px; }
+.account-form { display: flex; flex-direction: column; max-width: 420px; }
+.account-form input.search { width: 100%; font-size: 16px; }
+.account-form .ghost { margin-top: 10px; color: var(--muted); }
