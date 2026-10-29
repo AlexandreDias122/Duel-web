@@ -140,7 +140,7 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
   );
 }
 
-const GROUPS: [Option["group"], string][] = [["mine", "Mes decks"], ["meta", "Decks méta (l'IA connaît leurs combos)"], ["starter", "Decks de démarrage"]];
+const GROUPS: [Option["group"], string][] = [["mine", "Mes decks"], ["meta", "Decks méta"], ["starter", "Decks de démarrage"]];
 
 function DeckSelect({ options, value, onChange }: { options: Option[]; value: string; onChange: (v: string) => void }) {
   return (
