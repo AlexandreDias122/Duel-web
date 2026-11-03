@@ -4,7 +4,6 @@
   Chaque famille essaie, dans l'ordre :
     1. la police installée sur l'appareil (local),
     2. un fichier déposé dans ce dossier public/fonts/ (s'il existe),
-    3. (titres seulement) la copie hébergée par onlinewebfonts.
   Si rien ne répond, styles.css retombe sur une police libre de Google Fonts
   (Russo One, M PLUS 1p, Spectral).
 
@@ -15,12 +14,10 @@
 /* Titres : FOT-KafuTechno Std H (Fontworks) */
 @font-face {
   font-family: "DW Title";
-  font-display: block;
+  font-display: swap;
   src: local("FOT-KafuTechno Std H"), local("FOT-KafuTechnoStd-H"),
-    url("FOT-KafuTechnoStd-H.otf") format("opentype"),
-    url("https://db.onlinewebfonts.com/t/225324ba33a861d305512b4e328bf78b.woff2") format("woff2"),
-    url("https://db.onlinewebfonts.com/t/225324ba33a861d305512b4e328bf78b.woff") format("woff"),
-    url("https://db.onlinewebfonts.com/t/225324ba33a861d305512b4e328bf78b.ttf") format("truetype");
+    url("FOT-KafuTechnoStd-H.otf") format("opentype");
+  /* La copie d'onlinewebfonts est tronquée (glyphes manquants ou faux) : on ne l'utilise plus. */
 }
 
 /* Interface : Rodin Pro DB (texte courant) et RodinNTLG Pro B (gras) */
