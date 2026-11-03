@@ -4,12 +4,11 @@
   Chaque famille essaie, dans l'ordre :
     1. la police installée sur l'appareil (local),
     2. un fichier déposé dans ce dossier public/fonts/ (s'il existe),
-    3. (titres seulement) la copie hébergée par onlinewebfonts.
   Si rien ne répond, styles.css retombe sur une police libre de Google Fonts
   (Russo One, M PLUS 1p, Spectral).
 
   Les fichiers attendus dans public/fonts/ (facultatifs, non fournis : polices commerciales) :
-    FOT-KafuTechnoStd-H.otf, RODINNTLGPRO-B.otf, RodinPro-DB.otf, YGO_Card_NA.ttf, AtkDef.ttf
+    RODINNTLGPRO-B.otf, RodinPro-DB.otf, YGO_Card_NA.ttf, AtkDef.ttf
 */
 
 /* Titres : FOT-KafuTechno Std H (Fontworks) */
@@ -17,10 +16,9 @@
   font-family: "DW Title";
   font-display: block;
   src: local("FOT-KafuTechno Std H"), local("FOT-KafuTechnoStd-H"),
-    url("FOT-KafuTechnoStd-H.otf") format("opentype"),
-    url("https://db.onlinewebfonts.com/t/225324ba33a861d305512b4e328bf78b.woff2") format("woff2"),
-    url("https://db.onlinewebfonts.com/t/225324ba33a861d305512b4e328bf78b.woff") format("woff"),
-    url("https://db.onlinewebfonts.com/t/225324ba33a861d305512b4e328bf78b.ttf") format("truetype");
+    url("DWTitle.woff2") format("woff2");
+  /* DWTitle.woff2 : police redessinée à partir de captures du jeu de glyphes de KafuTechno
+     (A-Z, a-z, chiffres, ponctuation, accents français). La copie d'onlinewebfonts était tronquée. */
 }
 
 /* Interface : Rodin Pro DB (texte courant) et RodinNTLG Pro B (gras) */
