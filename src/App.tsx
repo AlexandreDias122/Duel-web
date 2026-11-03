@@ -49,16 +49,24 @@ export default function App() {
       .catch((e) => setError(String(e)));
   }, []);
 
-  if (error) return <div className="screen center"><h2>Chargement impossible</h2><p className="error">{error}</p></div>;
-  if (!data) {
-    return (
-      <div className="screen center splash">
-        <h1 className="logo">DUEL<span>WEB</span></h1>
-        <div className="spinner" />
-        <p className="muted">Chargement des 15 000 cartes…</p>
-      </div>
-    );
-  }
+  // Gros « DUEL » au lancement : reste au moins INTRO_MS, puis s'efface quand les cartes sont prêtes.
+  const [introDone, setIntroDone] = useState(false);
+  const [minElapsed, setMinElapsed] = useState(false);
+  const [skipped, setSkipped] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinElapsed(true), INTRO_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const introLeaving = (minElapsed || skipped) && (!!data || !!error);
+  useEffect(() => {
+    if (!introLeaving) return;
+    const t = setTimeout(() => setIntroDone(true), 550);
+    return () => clearTimeout(t);
+  }, [introLeaving]);
+  const intro = introDone ? null : <Intro leaving={introLeaving} loading={!data && !error} onSkip={() => setSkipped(true)} />;
+
+  if (error) return <>{intro}<div className="screen center"><h2>Chargement impossible</h2><p className="error">{error}</p></div></>;
+  if (!data) return intro;
 
   let content;
   switch (route.name) {
@@ -95,7 +103,21 @@ export default function App() {
       break;
   }
 
-  return <DbContext.Provider value={{ db: data.db, banlists: data.banlists }}>{content}</DbContext.Provider>;
+  return <DbContext.Provider value={{ db: data.db, banlists: data.banlists }}>{content}{intro}</DbContext.Provider>;
+}
+
+const INTRO_MS = 1800;
+
+function Intro({ leaving, loading, onSkip }: { leaving: boolean; loading: boolean; onSkip: () => void }) {
+  return (
+    <div className={`intro ${leaving ? "out" : ""}`} onClick={onSkip} role="presentation">
+      <div className="intro-glow">
+        <h1 className="intro-word" data-text="DUEL">DUEL</h1>
+      </div>
+      <div className="intro-sub">WEB</div>
+      {loading && <div className="intro-status">Chargement des 15 000 cartes…</div>}
+    </div>
+  );
 }
 
 const HERO_CARDS = [89631139, 46986414, 74677422, 70095154, 44508094, 10000020];
