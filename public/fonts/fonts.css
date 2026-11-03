@@ -8,16 +8,17 @@
   (Russo One, M PLUS 1p, Spectral).
 
   Les fichiers attendus dans public/fonts/ (facultatifs, non fournis : polices commerciales) :
-    FOT-KafuTechnoStd-H.otf, RODINNTLGPRO-B.otf, RodinPro-DB.otf, YGO_Card_NA.ttf, AtkDef.ttf
+    RODINNTLGPRO-B.otf, RodinPro-DB.otf, YGO_Card_NA.ttf, AtkDef.ttf
 */
 
 /* Titres : FOT-KafuTechno Std H (Fontworks) */
 @font-face {
   font-family: "DW Title";
-  font-display: swap;
+  font-display: block;
   src: local("FOT-KafuTechno Std H"), local("FOT-KafuTechnoStd-H"),
-    url("FOT-KafuTechnoStd-H.otf") format("opentype");
-  /* La copie d'onlinewebfonts est tronquée (glyphes manquants ou faux) : on ne l'utilise plus. */
+    url("DWTitle.woff2") format("woff2");
+  /* DWTitle.woff2 : police redessinée à partir de captures du jeu de glyphes de KafuTechno
+     (A-Z, a-z, chiffres, ponctuation, accents français). La copie d'onlinewebfonts était tronquée. */
 }
 
 /* Interface : Rodin Pro DB (texte courant) et RodinNTLG Pro B (gras) */
