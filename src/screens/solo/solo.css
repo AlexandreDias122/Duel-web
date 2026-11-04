@@ -335,3 +335,43 @@
   .duelist-text span { font-size: 15px; }
   .md-btn { font-size: 19px; }
 }
+
+/* Menus déroulants (banlist, règle, temps) dans les pastilles et les champs */
+.md-select { display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+.md-select select {
+  -webkit-appearance: none; appearance: none; width: auto; min-width: 0; max-width: 70%; padding: 0 22px 0 0; border: none; border-radius: 0; transform: none;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23d2f03a' stroke-width='2.2'/%3E%3C/svg%3E") no-repeat right center / 12px 8px;
+  color: inherit; font: inherit; text-overflow: ellipsis; cursor: pointer; outline: none;
+}
+.md-select select option { background: #0b0e18; color: #fff; }
+.md-pill.md-select { padding: 9px 20px; }
+.md-pill.md-select span { color: rgba(235, 240, 255, 0.8); white-space: nowrap; }
+.md-pill.md-select select { color: #fff; }
+.md-pill.md-select:focus-within { border-color: var(--lime); }
+.md-pill.md-select.off { opacity: 0.6; }
+.md-field.md-select { justify-content: space-between; }
+.md-field.md-select select { font-size: 20px; font-weight: 700; text-align: right; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+.solo-count { flex-wrap: wrap; }
+.solo-sort { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: rgba(225, 232, 245, 0.8); }
+.solo-sort select {
+  -webkit-appearance: none; appearance: none; width: auto; padding: 5px 26px 5px 10px; font-size: 14px; font-weight: 700; color: #fff; border-radius: 3px; transform: none;
+  background: #000 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23d2f03a' stroke-width='2.2'/%3E%3C/svg%3E") no-repeat right 8px center / 11px 7px;
+  border: 1.5px solid rgba(220, 225, 240, 0.7);
+}
+
+/* Pile ou face : tout tient dans l'écran, boutons compris */
+.toss { justify-content: flex-start; gap: 4px; overflow-y: auto; }
+.toss-title { margin-top: 2vh; }
+.toss-stage { width: min(46vw, 28vh, 220px); margin: 30vh 0 4vh; flex: 0 0 auto; transition: margin 0.5s ease, width 0.5s ease; }
+.toss-stage.landed { margin: 3vh 0 3vh; width: min(40vw, 22vh, 190px); }
+.toss-result { min-height: 0; }
+.toss-word { font-size: clamp(40px, 9vh, 76px); }
+.toss-result p { margin: 2px 0 8px; }
+@keyframes toss-lift {
+  0% { transform: translateY(0) scale(1); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  45% { transform: translateY(-22vh) scale(0.72); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  88% { transform: translateY(0) scale(1); }
+  94% { transform: translateY(-3vh) scale(0.97); }
+  100% { transform: translateY(0) scale(1); }
+}
+.toss-cancel { position: static; margin-top: 6px; padding: 8px; }

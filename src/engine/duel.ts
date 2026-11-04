@@ -1,11 +1,11 @@
 // Pilotage d'un duel ygopro-core : boucle de traitement, état du terrain, IA.
-import { OcgCoreInternal, OcgDuelMode, OcgMessageType as T, OcgProcessResult, OcgResponseType } from "ocgcore-wasm";
+import { OcgCoreInternal, OcgMessageType as T, OcgProcessResult, OcgResponseType } from "ocgcore-wasm";
 import type { OcgCoreSync, OcgDuelHandle, OcgLocation, OcgMessage, OcgResponse } from "ocgcore-wasm";
 import type { CardDb } from "../lib/cards";
 import { LOC, POS } from "../lib/constants";
 import { DuelAi, PROMPT_TYPES } from "./ai";
 import { getProfile } from "./aiDecks";
-import { DEFAULT_RULES } from "./protocol";
+import { DEFAULT_RULES, MASTER_RULE_FLAGS } from "./protocol";
 import type { DeckList, DuelRules, DuelState, FieldCard, FromWorker, PlayerState } from "./protocol";
 import { WINDBOT_QUERY } from "./windbot";
 import type { WindBotPlayer } from "./windbot";
@@ -22,8 +22,6 @@ export interface DuelSetup {
   /** Joueurs tenus par WindBot (l'IA maison reste en secours si WindBot n'a pas de réponse). */
   bots?: [WindBotPlayer | null, WindBotPlayer | null];
 }
-
-const MODE_FLAGS = { 3: OcgDuelMode.MODE_MR3, 4: OcgDuelMode.MODE_MR4, 5: OcgDuelMode.MODE_MR5 } as const;
 
 const QUERY_FLAGS =
   0x1 | 0x2 | 0x8 | 0x10 | 0x20 | 0x100 | 0x200 | 0x400 | 0x800 | 0x10000 | 0x20000 | 0x100000 | 0x200000 | 0x400000 | 0x800000;
@@ -112,7 +110,7 @@ export class DuelEngine {
     const rules = setup.rules ?? DEFAULT_RULES;
     const team = { startingLP: setup.lp, startingDrawCount: rules.startHand, drawCountPerTurn: rules.drawCount };
     const duel = core.createDuel({
-      flags: MODE_FLAGS[rules.masterRule],
+      flags: MASTER_RULE_FLAGS[rules.masterRule],
       seed: setup.seed,
       team1: team,
       team2: team,

@@ -1,10 +1,9 @@
 // WindBot Ignite (C#, compilé en WebAssembly .NET) comme adversaire.
 // Le bot reçoit exactement ce qu'un serveur EDOPro lui enverrait : les messages du moteur
 // (avec les informations cachées masquées), plus les rafraîchissements du terrain avant chaque question.
-import { OcgDuelMode } from "ocgcore-wasm";
 import type { CardDb } from "../lib/cards";
 import { LOC, POS, TYPE } from "../lib/constants";
-import { DEFAULT_RULES } from "./protocol";
+import { DEFAULT_RULES, MASTER_RULE_FLAGS } from "./protocol";
 import type { DeckList, DuelRules } from "./protocol";
 
 /** Deck WindBot proposé dans l'appli (liste générée par scripts/build-windbot.sh). */
@@ -127,7 +126,7 @@ export class WindBotPlayer {
 
   /** Paquets d'ouverture : salle (règles MR5) puis MSG_START. */
   start(lp: number, decks: [DeckList, DeckList], rules: DuelRules = DEFAULT_RULES) {
-    const flags = { 3: OcgDuelMode.MODE_MR3, 4: OcgDuelMode.MODE_MR4, 5: OcgDuelMode.MODE_MR5 }[rules.masterRule];
+    const flags = MASTER_RULE_FLAGS[rules.masterRule];
     const join = new DataView(new ArrayBuffer(1 + 56));
     let o = 0;
     join.setUint8(o++, STOC_JOIN_GAME);

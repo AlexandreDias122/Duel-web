@@ -1,4 +1,5 @@
 // Messages échangés entre l'interface et le worker qui fait tourner le moteur.
+import { OcgDuelMode } from "ocgcore-wasm";
 import type { OcgMessage, OcgResponse } from "ocgcore-wasm";
 
 export interface DeckList {
@@ -66,10 +67,15 @@ export interface DuelRules {
   /** Cartes piochées à chaque tour. */
   drawCount: number;
   /** Master Rule (5 = Nouvelles Master Rules). */
-  masterRule: 3 | 4 | 5;
+  masterRule: 1 | 2 | 3 | 4 | 5;
   /** Mélanger les decks au début du duel. */
   shuffle: boolean;
 }
+
+/** Drapeaux du moteur pour chaque Master Rule. */
+export const MASTER_RULE_FLAGS = {
+  1: OcgDuelMode.MODE_MR1, 2: OcgDuelMode.MODE_MR2, 3: OcgDuelMode.MODE_MR3, 4: OcgDuelMode.MODE_MR4, 5: OcgDuelMode.MODE_MR5,
+} as const;
 
 export const DEFAULT_RULES: DuelRules = { startHand: 5, drawCount: 1, masterRule: 5, shuffle: true };
 

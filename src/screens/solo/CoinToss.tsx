@@ -60,6 +60,7 @@ export function CoinToss({ opponentName, opponentGoesSecond, onDone, onCancel }:
                   <button className="md-cta" onClick={() => onDone(true)}>En premier</button>
                   <button className="md-btn" onClick={() => onDone(false)}>En second</button>
                 </div>
+                <button className="toss-cancel" onClick={onCancel}>Retour au salon</button>
               </>
             ) : (
               <p>{opponentName} a gagné le pile ou face<br />et choisit de commencer <b>{opponentGoesSecond ? "en second" : "en premier"}</b>.</p>
@@ -68,7 +69,6 @@ export function CoinToss({ opponentName, opponentGoesSecond, onDone, onCancel }:
         )}
         {stage !== "landed" && <p className="toss-hint">Face : vous choisissez. Pile : l'adversaire choisit.</p>}
       </div>
-      {stage === "landed" && face && <button className="toss-cancel" onClick={onCancel}>Retour au salon</button>}
     </div>
   );
 }

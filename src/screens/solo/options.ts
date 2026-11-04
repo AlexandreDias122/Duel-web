@@ -7,6 +7,10 @@ import { TYPE } from "../../lib/constants";
 import type { Banlist, Deck } from "../../lib/deck";
 import { adaptToBanlist, parseYdk, validateDeck } from "../../lib/deck";
 import type { StarterDeck } from "../DecksScreen";
+import WINDBOT_INFO from "../../engine/windbotInfo.json";
+
+/** Carte phare et description des decks WindBot, embarquées dans l'appli (bots.json peut venir d'un cache plus ancien). */
+const WB_INFO: Record<string, { cover: number; blurb: string }> = WINDBOT_INFO;
 
 /** Réglages du duel, choisis sur l'écran SOLO et rappelés dans le Salon. */
 export interface SoloSettings extends DuelRules {
@@ -62,6 +66,8 @@ export const RULE_LABELS: Record<DuelRules["masterRule"], string> = {
   5: "Nouvelles Master Rules",
   4: "Master Rules 4",
   3: "Master Rules 3",
+  2: "Master Rules 2",
+  1: "Master Rules 1",
 };
 
 export const TIMERS = [0, 60, 120, 180, 300, 600];
@@ -101,7 +107,7 @@ export function coverOf(db: CardDb, list: { main: number[]; extra: number[] }): 
 /** Decks WindBot (public/windbot/bots.json, absent si WindBot n'a pas été compilé). */
 let windbotDecks: Promise<WindBotDeck[]> | null = null;
 export function loadWindBotDecks(): Promise<WindBotDeck[]> {
-  windbotDecks ??= fetch(`${import.meta.env.BASE_URL}windbot/bots.json`)
+  windbotDecks ??= fetch(`${import.meta.env.BASE_URL}windbot/bots.json`, { cache: "no-cache" })
     .then((r) => (r.ok ? (r.json() as Promise<WindBotDeck[]>) : []))
     .catch(() => []);
   return windbotDecks;
@@ -116,7 +122,8 @@ export function buildOptions(db: CardDb, banlist: Banlist | null, mine: Deck[], 
   return [
     ...bots.map((w): DeckOption => ({
       key: `w:${w.deck}`, name: w.name, group: "windbot", list: { main: [], extra: [], windbot: w.deck },
-      cover: w.cover ?? 0, blurb: w.blurb || "WindBot joue son propre deck, avec un plan de jeu écrit pour lui.",
+      cover: WB_INFO[w.deck]?.cover ?? w.cover ?? 0,
+      blurb: WB_INFO[w.deck]?.blurb || w.blurb || "WindBot joue son propre deck, avec un plan de jeu écrit pour lui.",
       difficulty: w.difficulty, goSecond: w.goSecond, errors: [],
     })),
     ...AI_DECKS.map((m): DeckOption => {
