@@ -1,8 +1,9 @@
 // Duels IA contre IA en Node, pour vérifier le moteur et l'IA avec les vraies données.
-// Usage : npx tsx tests/ai-duel.ts [nombre de duels] [starter|meta|profil]
+// Usage : npx tsx tests/ai-duel.ts [nombre de duels] [starter|meta|profil|windbot]
 //   starter : decks de démarrage entre eux
 //   meta    : decks méta (avec leur profil) entre eux
 //   profil  : chaque deck méta, avec profil contre le même deck sans profil
+//   windbot : decks WindBot (npm run windbot) contre les decks méta de l'IA maison (WB=Blue-Eyes,… pour filtrer)
 import createCore from "ocgcore-wasm";
 import { OcgMessageType as T } from "ocgcore-wasm";
 import { readFileSync, existsSync } from "node:fs";
@@ -12,6 +13,9 @@ import { parseYdk, validateDeck } from "../src/lib/deck";
 import { AI_DECKS } from "../src/engine/aiDecks";
 import { handTrapKind } from "../src/engine/cardKnowledge";
 import type { DeckList, FromWorker } from "../src/engine/protocol";
+import { loadWindBot } from "../src/engine/windbot";
+import type { WindBotDeck, WindBotPlayer } from "../src/engine/windbot";
+import { pathToFileURL } from "node:url";
 
 const db = new CardDb(JSON.parse(readFileSync("public/data/cards.json", "utf8")), JSON.parse(readFileSync("public/data/strings.json", "utf8")));
 const starters: { name: string; ydk: string }[] = JSON.parse(readFileSync("public/data/decks/starter.json", "utf8"));
@@ -25,6 +29,11 @@ const readScript = (name: string) => {
 
 const n = Number(process.argv[2] ?? 4);
 const mode = process.argv[3] ?? "starter";
+const windbot = mode === "windbot" ? await loadWindBot(pathToFileURL("public/windbot/_framework/dotnet.js").href, db) : null;
+const onlyWb = process.env.WB?.split(",");
+const wbDecks: WindBotDeck[] = windbot
+  ? JSON.parse(readFileSync("public/windbot/bots.json", "utf8")).filter((d: WindBotDeck) => !onlyWb || onlyWb.includes(d.deck))
+  : [];
 
 // Les decks méta doivent être jouables tels quels avec la banlist TCG.
 for (const d of AI_DECKS) {
@@ -40,7 +49,11 @@ const pairs: [Entry, Entry][] = [];
 const only = process.env.DECKS?.split(",");
 const meta = AI_DECKS.filter((d) => !only || only.includes(d.id)).map((d): Entry => ({ name: d.name, list: { main: d.main, extra: d.extra, profile: d.id } }));
 for (let i = 0; i < n; i++) {
-  if (mode === "meta") {
+  if (mode === "windbot") {
+    const w = wbDecks[i % wbDecks.length], m = meta[Math.floor(i / wbDecks.length + i) % meta.length];
+    const bot: Entry = { name: `WindBot ${w.name}`, list: { main: [], extra: [], windbot: w.deck } };
+    pairs.push(i % 2 ? [m, bot] : [bot, m]);
+  } else if (mode === "meta") {
     const k = meta.length;
     const a = i % k, b = (a + 1 + Math.floor(i / k) % (k - 1)) % k;
     pairs.push([meta[a], meta[b]]);
@@ -69,12 +82,23 @@ function trace(turn: number, msg: import("ocgcore-wasm").OcgMessage) {
 }
 
 const wins = new Map<string, number[]>();
-let badSummons = 0, errors = 0;
+let badSummons = 0, errors = 0, wbAnswered = 0, wbMissed = 0, wbErrors = 0;
 pairs.forEach(([a, b], i) => {
   let end: (FromWorker & { kind: "end" }) | null = null;
   let turn = 0, chains = 0, handTraps = 0, t1Summons = 0, t1Board = 0;
+  const bots: [WindBotPlayer | null, WindBotPlayer | null] = [null, null];
+  const lists = [a.list, b.list].map((l, p) => {
+    if (!l.windbot || !windbot) return l;
+    const bot = windbot.create(l.windbot, p);
+    if (!bot) throw new Error(`deck WindBot inconnu : ${l.windbot}`);
+    bots[p] = bot;
+    const d = bot.deck();
+    const missing = [...d.main, ...d.extra].filter((c) => !db.get(c));
+    if (missing.length) console.log(`  ⚠ ${l.windbot} : cartes inconnues`, [...new Set(missing)]);
+    return d;
+  }) as [DeckList, DeckList];
   const engine = new DuelEngine(core, db, {
-    decks: [a.list, b.list], ai: [true, true], lp: 8000, baseScripts, readScript,
+    decks: lists, ai: [true, true], lp: 8000, baseScripts, readScript, bots,
     // En mode profil, les deux sens d'un même duel partagent la graine : le joueur 1 a la même main.
     seed: [BigInt((mode === "profil" ? Math.floor(i / 2) : i) + 1 + Number(process.env.SEED ?? 0)), 2n, 3n, 4n],
   }, (m) => {
@@ -82,7 +106,8 @@ pairs.forEach(([a, b], i) => {
       turn = m.state.turn;
       if (turn === 1) t1Board = m.state.players[0].mzone.filter(Boolean).length + m.state.players[0].szone.filter(Boolean).length;
       for (const msg of m.messages) {
-        if (msg.type === T.SUMMONING && handTrapKind(db.get(msg.code))) {
+        // WindBot joue ses propres decks à sa façon : on ne contrôle que l'IA maison.
+        if (msg.type === T.SUMMONING && handTrapKind(db.get(msg.code)) && !bots[msg.controller]) {
           badSummons++;
           console.log(`  ✗ Invocation Normale d'une hand trap : ${db.get(msg.code)?.name}`);
         }
@@ -95,6 +120,7 @@ pairs.forEach(([a, b], i) => {
       }
     }
     if (m.kind === "end") end = m;
+    if (m.kind === "chat" && process.env.CHAT) console.log(`    💬 ${m.text}`);
     if (m.kind === "error") { errors++; console.log("  erreur :", m.error); }
   });
   const t = Date.now();
@@ -105,6 +131,12 @@ pairs.forEach(([a, b], i) => {
     console.log("  exception :", e);
   }
   const winner = end ? (end as { winner: number }).winner : -1;
+  for (const bot of bots) {
+    if (!bot) continue;
+    if (bot.errors) { wbErrors += bot.errors; console.log(`  ⚠ WindBot a planté sur ${bot.errors} message(s)`); }
+    wbAnswered += bot.answered;
+    wbMissed += bot.missed;
+  }
   for (const [k, e] of [[0, a], [1, b]] as const) {
     const w = wins.get(e.name) ?? [0, 0, 0, 0, 0];
     w[1]++;
@@ -119,4 +151,5 @@ console.log("\nBilan :");
 for (const [name, [w, p, f, ss, board]] of [...wins].sort((x, y) => y[1][0] / y[1][1] - x[1][0] / x[1][1]))
   console.log(`  ${name} : ${w}/${p}` + (f ? ` · tour 1 : ${(ss / f).toFixed(1)} Invoc. Spéciales, ${(board / f).toFixed(1)} cartes posées` : ""));
 console.log(`Hand traps invoquées normalement : ${badSummons} ; erreurs : ${errors}`);
+if (windbot) console.log(`WindBot : ${wbAnswered} réponses, ${wbMissed} laissées à l'IA maison, ${wbErrors} plantages`);
 if (badSummons || errors) process.exitCode = 1;

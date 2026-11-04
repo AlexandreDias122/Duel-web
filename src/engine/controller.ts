@@ -45,6 +45,8 @@ export interface DuelView {
   error: string | null;
   /** Temps restant ce tour (secondes), null sans minuteur. */
   clock: number | null;
+  /** Dernière réplique de WindBot, affichée quelques secondes. */
+  chat: { id: number; player: number; text: string } | null;
 }
 
 // Un seul worker pour toute la session : le moteur et les cartes restent chargés entre deux duels.
@@ -78,7 +80,8 @@ export class DuelController {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private fxId = 0;
   private promptId = 0;
-  view: DuelView = { loading: "Démarrage du moteur…", state: null, prompt: null, log: [], fx: [], thinking: false, end: null, error: null, clock: null };
+  private chatId = 0;
+  view: DuelView = { loading: "Démarrage du moteur…", state: null, prompt: null, log: [], fx: [], thinking: false, end: null, error: null, clock: null, chat: null };
 
   /** turnSeconds : temps de réflexion par tour (0 = illimité). */
   constructor(private db: CardDb, readonly mode: DuelMode, decks: [DeckList, DeckList], readonly human: number, private turnSeconds = 0) {
@@ -185,6 +188,12 @@ export class DuelController {
         this.set({ state: m.state, loading: null, thinking: false, log: log.slice(-200) });
         fx.forEach((f) => this.addFx(f));
         pause = Math.min(pause, 2200);
+      } else if (m.kind === "chat") {
+        const chat = { id: ++this.chatId, player: m.player, text: m.text };
+        this.set({ chat, log: [...this.view.log, { text: `« ${m.text} »`, player: m.player }].slice(-200) });
+        setTimeout(() => {
+          if (!this.disposed && this.view.chat?.id === chat.id) this.set({ chat: null });
+        }, 3200);
       } else if (m.kind === "prompt") {
         this.set({ thinking: false, prompt: { id: ++this.promptId, message: m.message, hint: m.hint, retry: m.retry } });
         this.startClock();

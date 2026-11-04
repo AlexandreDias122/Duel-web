@@ -1,0 +1,16 @@
+{
+  "welcome": ["Salut, je suis WindBot !"],
+  "deckerror": ["Désolé, j'ai trop de {0} dans mon deck."],
+  "duelstart": ["C'est l'heure du duel !", "Bonne chance, et amuse-toi bien !"],
+  "newturn": ["À moi ! Je pioche !", "Mon tour. Je pioche !", "Je pioche !"],
+  "endturn": ["Je termine mon tour.", "Mon tour est fini.", "À toi de jouer."],
+  "directattack": ["{0}, attaque directe !", "{0}, attaque-le directement !", "Tu es sans défense. Attaque, {0} !", "{0}, frappe ses Life Points !", "{0}, libère ta puissance !", "Mon {0} va réduire tes Life Points à néant !", "Admire la puissance de mon {0} !", "Tu ne peux pas m'arrêter ! {0}, attaque !"],
+  "attack": ["{0}, attaque son {1} !", "{0}, détruis son {1} !", "Mon {0} va anéantir ton {1} !", "Ton {1} ne fait pas le poids face à mon {0} !", "{0}, déchaîne-toi sur son {1} !"],
+  "ondirectattack": ["Argh… !", "{0} ne me fait pas peur !", "Tu crois que ça suffira pour me battre ?", "Ce n'est qu'une égratignure !"],
+  "facedownmonstername": "monstre",
+  "activate": ["J'active {0} !", "J'utilise {0}."],
+  "summon": ["J'Invoque {0} !", "Viens, {0} !", "Apparais, {0} !", "{0}, montre-toi !"],
+  "setmonster": ["Je pose un monstre face verso.", "Qu'est-ce que ça pourrait bien être ?", "Attaque ce monstre, si tu l'oses !"],
+  "chaining": ["Pas si vite ! J'active {0} !", "Avant ça, j'enchaîne {0} !", "Bien essayé, mais j'ai {0} !", "Tu ne t'attendais pas à {0}, hein ?"],
+  "surrender": ["J'abandonne.", "Tu as gagné cette fois.", "Je ne peux pas gagner ce duel.", "Bien joué."]
+}

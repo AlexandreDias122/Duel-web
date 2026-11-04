@@ -6,6 +6,8 @@ import { LOC, POS } from "../lib/constants";
 import { DuelAi, PROMPT_TYPES } from "./ai";
 import { getProfile } from "./aiDecks";
 import type { DeckList, DuelState, FieldCard, FromWorker, PlayerState } from "./protocol";
+import { WINDBOT_QUERY } from "./windbot";
+import type { WindBotPlayer } from "./windbot";
 
 export interface DuelSetup {
   decks: [DeckList, DeckList];
@@ -15,6 +17,8 @@ export interface DuelSetup {
   /** Lecture synchrone d'un script Lua (null s'il n'existe pas). */
   readScript: (name: string) => string | null;
   baseScripts: string[];
+  /** Joueurs tenus par WindBot (l'IA maison reste en secours si WindBot n'a pas de réponse). */
+  bots?: [WindBotPlayer | null, WindBotPlayer | null];
 }
 
 const QUERY_FLAGS =
@@ -67,14 +71,14 @@ function autoResponse(prompt: OcgMessage): OcgResponse | null {
 }
 
 /** Temps de réaction simulé de l'IA, seulement quand elle prend une vraie décision. */
-function thinkTime(prompt: OcgMessage, response: OcgResponse): number {
+function thinkTime(prompt: OcgMessage, passed: boolean): number {
   const jitter = (min: number, max: number) => Math.round(min + Math.random() * (max - min));
   switch (prompt.type) {
     case T.SELECT_IDLECMD: return jitter(900, 1700);
     case T.SELECT_BATTLECMD: return jitter(700, 1300);
     case T.SELECT_CHAIN:
       if (!prompt.selects.length) return 0;
-      return (response as { index: number | null }).index === null ? jitter(300, 600) : jitter(800, 1400);
+      return passed ? jitter(300, 600) : jitter(800, 1400);
     case T.SELECT_EFFECTYN: case T.SELECT_YESNO: case T.SELECT_OPTION: return jitter(500, 900);
     case T.SELECT_CARD: case T.SELECT_UNSELECT_CARD: case T.SELECT_TRIBUTE: case T.SELECT_SUM: return jitter(600, 1100);
     case T.SELECT_PLACE: case T.SELECT_POSITION: return jitter(250, 500);
@@ -135,7 +139,11 @@ export class DuelEngine {
         core.duelNewCard(duel, { team: team as 0 | 1, duelist: 0, code, controller: team as 0 | 1, location: LOC.EXTRA, sequence: 0, position: POS.FACEDOWN_DEFENSE });
     });
     core.startDuel(duel);
+    this.bots = setup.bots ?? [null, null];
+    for (const bot of this.bots) bot?.start(setup.lp, setup.decks);
   }
+
+  private bots: [WindBotPlayer | null, WindBotPlayer | null];
 
   /** Fait avancer le duel jusqu'à la prochaine décision humaine. */
   run(retry = false) {
@@ -143,6 +151,9 @@ export class DuelEngine {
     for (let guard = 0; guard < 50000 && !this.finished; guard++) {
       const status = this.core.duelProcess(this.duel);
       const messages = this.core.duelGetMessage(this.duel);
+      const raws = this.bots[0] || this.bots[1] ? this.rawMessages() : [];
+      for (const raw of raws) for (const bot of this.bots) bot?.observe(raw);
+      this.bots.forEach((bot, p) => bot?.chat().forEach((text) => this.emit({ kind: "chat", player: p, text })));
       let prompt: OcgMessage | null = null;
       for (const m of messages) {
         this.track(m);
@@ -174,6 +185,23 @@ export class DuelEngine {
       const state = this.state();
       this.emit({ kind: "update", state, messages: visible });
       const player = (prompt as { player?: number }).player ?? 0;
+      const bot = this.bots[player];
+      if (bot && this.setup.ai[player] && !isRetry) {
+        const rawPrompt = raws[raws.length - 1];
+        const answer = rawPrompt && PROMPT_TYPES.has(rawPrompt[0]) ? bot.respond(rawPrompt, (p, l) => this.rawQuery(p, l, WINDBOT_QUERY)) : null;
+        for (const text of bot.chat()) this.emit({ kind: "chat", player, text });
+        if (bot.surrendered) {
+          this.finished = true;
+          this.emit({ kind: "end", winner: 1 - player, reason: "Abandon de WindBot" });
+          return;
+        }
+        if (answer) {
+          const ms = thinkTime(prompt, answer.length === 4 && new DataView(answer.buffer, answer.byteOffset).getInt32(0, true) === -1);
+          if (ms) this.emit({ kind: "think", ms });
+          this.setRawResponse(answer);
+          continue;
+        }
+      }
       if (this.setup.ai[player]) {
         // Le moteur repose sans cesse la même question : la réponse de l'IA ne convient pas, on passe à la plus sûre.
         const sig = JSON.stringify(prompt, (_k, v) => (typeof v === "bigint" ? String(v) : v));
@@ -182,7 +210,7 @@ export class DuelEngine {
         if (this.repeats > 12) isRetry = true;
         const response = this.ai[player].respond(prompt, state, isRetry, this.hint[player]);
         this.hint[player] = 0n;
-        const ms = thinkTime(prompt, response);
+        const ms = thinkTime(prompt, (response as { index?: number | null }).index === null);
         if (ms) this.emit({ kind: "think", ms });
         this.core.duelSetResponse(this.duel, response);
         isRetry = false;
@@ -292,27 +320,74 @@ export class DuelEngine {
    * (le décodeur fourni par ocgcore-wasm 0.1.6 renvoie des champs décalés).
    */
   private queryLocation(player: number, location: number): (FieldCard | null)[] {
+    const raw = this.rawQuery(player, location, QUERY_FLAGS);
+    return parseLocation(new DataView(raw.buffer, raw.byteOffset, raw.byteLength));
+  }
+
+  /** Accès direct au module WebAssembly et au duel (pour lire les tampons bruts du moteur). */
+  private raw(): { m: RawModule; handle: number } {
     const m = (this.core as unknown as Record<symbol, { module: RawModule }>)[OcgCoreInternal].module;
     const handle = (Object.getOwnPropertySymbols(this.duel).map((s) => (this.duel as unknown as Record<symbol, { handle: number }>)[s])[0]).handle;
+    return { m, handle };
+  }
+
+  /** Tampon brut de OCG_DuelQueryLocation (copié). */
+  private rawQuery(player: number, location: number, flags: number): Uint8Array {
+    const { m, handle } = this.raw();
     const stack = m.stackSave();
     try {
       const q = m.stackAlloc(20);
       const view = new DataView(m.HEAPU8.buffer);
-      view.setUint32(q, QUERY_FLAGS, true);
+      view.setUint32(q, flags, true);
       view.setUint8(q + 4, player);
       view.setUint32(q + 8, location, true);
       view.setUint32(q + 12, 0, true);
       view.setUint32(q + 16, 0, true);
       const lenPtr = m.stackAlloc(4);
       const ptr = m._ocgapiDuelQueryLocation(handle, lenPtr, q);
-      const len = view.getUint32(lenPtr, true);
-      return parseLocation(new DataView(m.HEAPU8.buffer, ptr, len));
+      const len = new DataView(m.HEAPU8.buffer).getUint32(lenPtr, true);
+      return m.HEAPU8.slice(ptr, ptr + len);
+    } finally {
+      m.stackRestore(stack);
+    }
+  }
+
+  /** Messages bruts du dernier traitement (le moteur garde son tampon jusqu'au prochain OCG_DuelProcess). */
+  private rawMessages(): Uint8Array[] {
+    const { m, handle } = this.raw();
+    const stack = m.stackSave();
+    try {
+      const lenPtr = m.stackAlloc(4);
+      const ptr = m._ocgapiDuelGetMessage(handle, lenPtr);
+      const len = new DataView(m.HEAPU8.buffer).getUint32(lenPtr, true);
+      const buf = m.HEAPU8.slice(ptr, ptr + len);
+      const view = new DataView(buf.buffer);
+      const out: Uint8Array[] = [];
+      for (let o = 0; o + 4 <= buf.length; ) {
+        const size = view.getUint32(o, true);
+        out.push(buf.slice(o + 4, o + 4 + size));
+        o += 4 + size;
+      }
+      return out;
+    } finally {
+      m.stackRestore(stack);
+    }
+  }
+
+  private setRawResponse(data: Uint8Array) {
+    const { m, handle } = this.raw();
+    const stack = m.stackSave();
+    try {
+      const ptr = m.stackAlloc(Math.max(1, data.length));
+      m.HEAPU8.set(data, ptr);
+      m._ocgapiDuelSetResponse(handle, ptr, data.length);
     } finally {
       m.stackRestore(stack);
     }
   }
 
   destroy() {
+    for (const bot of this.bots) bot?.destroy();
     this.core.destroyDuel(this.duel);
   }
 }
@@ -323,6 +398,8 @@ interface RawModule {
   stackRestore(p: number): void;
   stackAlloc(n: number): number;
   _ocgapiDuelQueryLocation(duel: number, lenPtr: number, info: number): number;
+  _ocgapiDuelGetMessage(duel: number, lenPtr: number): number;
+  _ocgapiDuelSetResponse(duel: number, data: number, len: number): void;
 }
 
 function pad<T>(list: (T | null)[], n: number): (T | null)[] {
