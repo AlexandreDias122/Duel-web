@@ -17,6 +17,7 @@ interface Props {
 }
 
 type Tab = "all" | "windbot" | "decks" | "mine";
+type Sort = "name" | "easy" | "hard";
 
 /** Adversaire proposé par défaut. */
 const DEFAULT_OPPONENT = "w:Maliss";
@@ -47,7 +48,12 @@ export function SoloScreen({ decks, starters, onBack, onStart }: Props) {
   const tabs: [Tab, string][] = [["all", "Tous"], ["windbot", "WindBot"], ["decks", "Decks"], ["mine", "Votre deck"]];
   const q = query.trim().toLowerCase();
   const shown = options.filter((o) => inTab(o, tab) && (!q || o.name.toLowerCase().includes(q)));
-  const [advanced, setAdvanced] = useState(false);
+  const [sort, setSort] = useState<Sort>("name");
+  const sorted = sort === "name" ? shown : [...shown].sort((x, y) => {
+    // Les decks sans difficulté (méta, démarrage, les vôtres) passent après les WindBot.
+    const dx = x.difficulty ?? (sort === "easy" ? 99 : -1), dy = y.difficulty ?? (sort === "easy" ? 99 : -1);
+    return (sort === "easy" ? dx - dy : dy - dx) || x.name.localeCompare(y.name);
+  });
 
   const start = () => {
     if (!opponent) return;
@@ -61,7 +67,17 @@ export function SoloScreen({ decks, starters, onBack, onStart }: Props) {
     <div className="solo md-screen">
       <section className="solo-left">
         <MdHeader title="SOLO" onBack={onBack} />
-        <div className="solo-count"><span>Adversaires</span><b>{options.length}</b></div>
+        <div className="solo-count">
+          <span>Adversaires</span><b>{options.length}</b>
+          <label className="solo-sort">
+            <span>Trier :</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+              <option value="name">Nom</option>
+              <option value="easy">Difficulté ★ → ★★★★★</option>
+              <option value="hard">Difficulté ★★★★★ → ★</option>
+            </select>
+          </label>
+        </div>
         <label className="md-search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg>
           <input type="search" placeholder="Rechercher un adversaire" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -74,7 +90,7 @@ export function SoloScreen({ decks, starters, onBack, onStart }: Props) {
           ))}
         </div>
         <ul className="solo-list">
-          {shown.map((o) => (
+          {sorted.map((o) => (
             <li key={o.key}>
               <button className={`solo-item ${o.key === opponent?.key ? "on" : ""}`} onClick={() => setPicked(o.key)}>
                 <span className="solo-thumb"><Art code={o.cover} /></span>
@@ -102,29 +118,29 @@ export function SoloScreen({ decks, starters, onBack, onStart }: Props) {
             Mélange<i>{settings.shuffle ? "ON" : "OFF"}</i>
           </button>
           <div className="md-fields">
-            <button className="md-field" onClick={() => set({ turnSeconds: TIMERS[(TIMERS.indexOf(settings.turnSeconds) + 1) % TIMERS.length] })}>
-              <span>Temps par tour :</span><b>{timerLabel(settings.turnSeconds)}</b>
-            </button>
+            <label className="md-field md-select">
+              <span>Temps par tour :</span>
+              <select value={settings.turnSeconds} onChange={(e) => set({ turnSeconds: Number(e.target.value) })}>
+                {TIMERS.map((t) => <option key={t} value={t}>{timerLabel(t)}</option>)}
+              </select>
+            </label>
             <NumberField label="Points de vie :" value={settings.lp} min={100} max={99999} onChange={(lp) => set({ lp })} />
             <NumberField label="Main de départ :" value={settings.startHand} min={1} max={20} onChange={(startHand) => set({ startHand })} />
             <NumberField label="Cartes par pioche :" value={settings.drawCount} min={1} max={10} onChange={(drawCount) => set({ drawCount })} />
           </div>
-          <button className="md-pill" onClick={() => set({ masterRule: settings.masterRule === 5 ? 4 : settings.masterRule === 4 ? 3 : 5 })}>
-            Règle : {RULE_LABELS[settings.masterRule]}
-          </button>
-          <button className={`md-pill ${advanced ? "open" : ""}`} onClick={() => setAdvanced(!advanced)}>Réglages avancés du duel</button>
-          {advanced && (
-            <div className="md-advanced">
-              <label>
-                <span>Banlist</span>
-                <select value={settings.banlist} disabled={!settings.deckCheck} onChange={(e) => set({ banlist: e.target.value })}>
-                  {banlists.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
-                  <option value="">Aucune (tout autorisé)</option>
-                </select>
-              </label>
-              <p>{settings.deckCheck ? "Les decks de l'IA sont ajustés à la banlist choisie." : "Vérification du Deck désactivée : aucune banlist."}</p>
-            </div>
-          )}
+          <label className={`md-pill md-select ${settings.deckCheck ? "" : "off"}`}>
+            <span>Banlist :</span>
+            <select value={settings.deckCheck ? settings.banlist : ""} disabled={!settings.deckCheck} onChange={(e) => set({ banlist: e.target.value })}>
+              {banlists.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
+              <option value="">Aucune (tout autorisé)</option>
+            </select>
+          </label>
+          <label className="md-pill md-select">
+            <span>Règle :</span>
+            <select value={settings.masterRule} onChange={(e) => set({ masterRule: Number(e.target.value) as SoloSettings["masterRule"] })}>
+              {([5, 4, 3, 2, 1] as const).map((r) => <option key={r} value={r}>{RULE_LABELS[r]}</option>)}
+            </select>
+          </label>
           <div className="md-desc">
             <MdTab>Description du Deck IA</MdTab>
             {opponent && (
