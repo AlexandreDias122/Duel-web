@@ -79,7 +79,7 @@ select, input.search, .filters input {
 }
 .screen.center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; }
 .screen-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.screen-head h2 { margin: 0; font-size: 22px; font-family: var(--font-title); font-style: italic; font-weight: 400; letter-spacing: 0.03em; }
+.screen-head h2 { margin: 0; font-size: 22px; font-family: var(--font-title); font-style: italic; font-weight: 700; letter-spacing: 0.03em; }
 .field-label { display: block; margin: 16px 0 6px; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
 .segmented { display: flex; gap: 6px; }
 .segmented button { flex: 1; }
@@ -112,7 +112,7 @@ select, input.search, .filters input {
   padding: calc(var(--safe-top) + 28px) 0 calc(var(--safe-bottom) + 16px);
 }
 .home-title {
-  font-family: var(--font-title); font-style: italic; font-weight: 400; font-size: 30px; margin: 0 0 22vh 18px; letter-spacing: 0.04em;
+  font-family: var(--font-title); font-style: italic; font-weight: 700; font-size: 30px; margin: 0 0 22vh 18px; letter-spacing: 0.04em;
   color: #fff; text-shadow: 0 0 18px rgba(255, 60, 90, 0.6);
 }
 .home-title small { font-size: 15px; color: #ffd84a; }
@@ -122,7 +122,7 @@ select, input.search, .filters input {
   background: transparent; border: none; border-left: 4px solid rgba(255, 255, 255, 0.5); border-radius: 0;
   padding: 6px 40px 6px 14px; color: #fff;
 }
-.home-label { font-family: var(--font-title); font-style: italic; font-size: 30px; letter-spacing: 0.06em; line-height: 1.05; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6); }
+.home-label { font-family: var(--font-title); font-weight: 700; font-style: italic; font-size: 30px; letter-spacing: 0.06em; line-height: 1.05; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6); }
 .home-sub { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
 .home-item.on {
   background: linear-gradient(90deg, #d7ff3a, #b8e81c 75%, rgba(184, 232, 28, 0.85));
@@ -155,7 +155,7 @@ select, input.search, .filters input {
   animation: intro-word 0.9s cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
 }
 .intro-word {
-  position: relative; margin: 0; font-family: var(--font-title); font-style: italic; font-weight: 400; line-height: 1;
+  position: relative; margin: 0; font-family: var(--font-title); font-style: italic; font-weight: 700; line-height: 1;
   font-size: clamp(96px, 34vw, 260px); letter-spacing: 0.02em; padding: 0 0.12em;
   background: linear-gradient(180deg, #ffffff 0%, #fff4c9 38%, var(--gold) 62%, var(--gold2) 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
@@ -167,7 +167,7 @@ select, input.search, .filters input {
   animation: intro-shine 1.8s 0.8s ease-in-out infinite;
 }
 .intro-sub {
-  position: relative; font-family: var(--font-title); font-style: italic; font-size: 16px; letter-spacing: 0.5em; color: var(--cyan);
+  position: relative; font-family: var(--font-title); font-weight: 700; font-style: italic; font-size: 16px; letter-spacing: 0.5em; color: var(--cyan);
   text-shadow: 0 0 10px rgba(79, 214, 255, 0.8); animation: intro-fade 0.6s 0.5s both;
 }
 .intro-status { position: absolute; bottom: calc(var(--safe-bottom) + 32px); font-size: 12px; color: var(--muted); animation: intro-fade 0.6s 0.8s both; }
@@ -367,6 +367,7 @@ select, input.search, .filters input {
 }
 .lp-op .avatar { background: radial-gradient(circle at 35% 30%, #ff9cad, #8c1630); border-color: #ffd0d8; box-shadow: 0 0 10px rgba(255, 80, 110, 0.6); }
 .lp-plate.active .avatar { box-shadow: 0 0 0 2px var(--gold), 0 0 16px rgba(242, 196, 90, 0.9); }
+.avatar.avatar-img { display: block; object-fit: cover; padding: 0; background: radial-gradient(circle at 50% 40%, #3a3f4c, #111318); transform: none; }
 .lp-body { display: flex; flex-direction: column; min-width: 0; }
 .pname { font-size: 10px; color: #b7c4ea; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 .lp-value { font-size: 22px; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; color: #fff; text-shadow: 0 0 10px rgba(120, 180, 255, 0.8); font-style: italic; }
@@ -584,7 +585,7 @@ select, input.search, .filters input {
   position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: rgba(2, 4, 12, 0.8); text-align: center;
 }
-.end-overlay h1 { font-family: var(--font-title); font-weight: 400; font-size: 52px; margin: 0; letter-spacing: 0.1em; font-style: italic; }
+.end-overlay h1 { font-family: var(--font-title); font-weight: 700; font-size: 52px; margin: 0; letter-spacing: 0.1em; font-style: italic; }
 .end-overlay h1.win { color: var(--gold); text-shadow: 0 0 30px rgba(242, 196, 90, 0.8); }
 .end-overlay h1.lose { color: var(--red); text-shadow: 0 0 30px rgba(255, 90, 110, 0.6); }
 
@@ -787,7 +788,7 @@ select, input.search, .filters input {
   border-color: rgba(255, 170, 190, 0.85);
 }
 .fx-banner span {
-  font-family: var(--font-title); font-style: italic; font-size: clamp(18px, 6vw, 28px); text-transform: uppercase;
+  font-family: var(--font-title); font-weight: 700; font-style: italic; font-size: clamp(18px, 6vw, 28px); text-transform: uppercase;
   letter-spacing: 0.04em; color: #fff; text-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 .fx-banner.big { height: 50px; }
@@ -805,11 +806,11 @@ select, input.search, .filters input {
 .fx-chain-card.c0 { transform: translate(-48%, 12%) rotate(-12deg); animation: chain-card-a 1.3s ease-out both; }
 .fx-chain-card.c1 { transform: translate(48%, -16%) rotate(10deg); animation: chain-card-b 1.3s ease-out both; }
 .fx-chain-card b {
-  position: absolute; right: -14px; bottom: -18px; font-family: var(--font-title); font-style: italic; font-size: 44px; color: #eafcff;
+  position: absolute; right: -14px; bottom: -18px; font-family: var(--font-title); font-weight: 700; font-style: italic; font-size: 44px; color: #eafcff;
   -webkit-text-stroke: 2px #1a9ad6; text-shadow: 0 0 14px rgba(80, 210, 255, 0.95);
 }
 .fx-chain-text {
-  position: relative; z-index: 2; font-family: var(--font-title); font-style: italic; font-size: clamp(30px, 11vw, 52px);
+  position: relative; z-index: 2; font-family: var(--font-title); font-weight: 700; font-style: italic; font-size: clamp(30px, 11vw, 52px);
   color: #fff; letter-spacing: 0.06em; text-transform: uppercase; text-shadow: 0 0 16px rgba(120, 220, 255, 0.95), 0 3px 0 #0b3a66;
   animation: chain-text 1.3s ease-out both;
 }
@@ -819,7 +820,7 @@ select, input.search, .filters input {
 
 .fx-resolve { position: absolute; inset: 0; z-index: 20; pointer-events: none; display: flex; align-items: center; justify-content: center; }
 .fx-resolve span {
-  font-family: var(--font-title); font-style: italic; font-size: clamp(28px, 10vw, 48px); text-transform: uppercase; color: #fff;
+  font-family: var(--font-title); font-weight: 700; font-style: italic; font-size: clamp(28px, 10vw, 48px); text-transform: uppercase; color: #fff;
   letter-spacing: 0.05em; text-shadow: 0 0 14px rgba(255, 255, 255, 0.8), 0 3px 0 #333; animation: resolve 0.9s ease-out forwards;
 }
 @keyframes resolve {
@@ -832,7 +833,7 @@ select, input.search, .filters input {
 /* Dégâts : chiffres qui jaillissent près des LP */
 .duel-top, .duel-bottom { position: relative; }
 .damage-pop {
-  position: absolute; z-index: 25; pointer-events: none; font-family: var(--font-title); font-style: italic;
+  position: absolute; z-index: 25; pointer-events: none; font-family: var(--font-title); font-weight: 700; font-style: italic;
   font-size: 30px; color: #ff4d5e; text-shadow: 0 0 10px rgba(255, 60, 80, 0.9), 0 2px 0 #400; animation: pop 1.3s ease-out forwards;
 }
 .duel-top .damage-pop { right: 90px; top: 64px; }

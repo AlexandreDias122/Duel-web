@@ -5,7 +5,8 @@ import type { CardDb } from "../lib/cards";
 import { LOC, POS } from "../lib/constants";
 import { DuelAi, PROMPT_TYPES } from "./ai";
 import { getProfile } from "./aiDecks";
-import type { DeckList, DuelState, FieldCard, FromWorker, PlayerState } from "./protocol";
+import { DEFAULT_RULES } from "./protocol";
+import type { DeckList, DuelRules, DuelState, FieldCard, FromWorker, PlayerState } from "./protocol";
 import { WINDBOT_QUERY } from "./windbot";
 import type { WindBotPlayer } from "./windbot";
 
@@ -14,12 +15,15 @@ export interface DuelSetup {
   ai: [boolean, boolean];
   seed: [bigint, bigint, bigint, bigint];
   lp: number;
+  rules?: DuelRules;
   /** Lecture synchrone d'un script Lua (null s'il n'existe pas). */
   readScript: (name: string) => string | null;
   baseScripts: string[];
   /** Joueurs tenus par WindBot (l'IA maison reste en secours si WindBot n'a pas de réponse). */
   bots?: [WindBotPlayer | null, WindBotPlayer | null];
 }
+
+const MODE_FLAGS = { 3: OcgDuelMode.MODE_MR3, 4: OcgDuelMode.MODE_MR4, 5: OcgDuelMode.MODE_MR5 } as const;
 
 const QUERY_FLAGS =
   0x1 | 0x2 | 0x8 | 0x10 | 0x20 | 0x100 | 0x200 | 0x400 | 0x800 | 0x10000 | 0x20000 | 0x100000 | 0x200000 | 0x400000 | 0x800000;
@@ -105,9 +109,10 @@ export class DuelEngine {
   constructor(private core: OcgCoreSync, private db: CardDb, private setup: DuelSetup, private emit: (m: FromWorker) => void) {
     this.ai = [0, 1].map((p) => new DuelAi(db, p, getProfile(setup.decks[p].profile))) as [DuelAi, DuelAi];
     this.lp = [setup.lp, setup.lp];
-    const team = { startingLP: setup.lp, startingDrawCount: 5, drawCountPerTurn: 1 };
+    const rules = setup.rules ?? DEFAULT_RULES;
+    const team = { startingLP: setup.lp, startingDrawCount: rules.startHand, drawCountPerTurn: rules.drawCount };
     const duel = core.createDuel({
-      flags: OcgDuelMode.MODE_MR5,
+      flags: MODE_FLAGS[rules.masterRule],
       seed: setup.seed,
       team1: team,
       team2: team,
@@ -133,14 +138,15 @@ export class DuelEngine {
     // Le moteur ne mélange pas lui-même le deck : on le mélange avant de poser les cartes.
     const rng = seededRandom(setup.seed);
     setup.decks.forEach((deck, team) => {
-      for (const code of shuffle(deck.main, rng))
+      // Sans mélange, la carte du haut du deck est la première de la liste.
+      for (const code of rules.shuffle ? shuffle(deck.main, rng) : [...deck.main].reverse())
         core.duelNewCard(duel, { team: team as 0 | 1, duelist: 0, code, controller: team as 0 | 1, location: LOC.DECK, sequence: 0, position: POS.FACEDOWN_DEFENSE });
       for (const code of deck.extra)
         core.duelNewCard(duel, { team: team as 0 | 1, duelist: 0, code, controller: team as 0 | 1, location: LOC.EXTRA, sequence: 0, position: POS.FACEDOWN_DEFENSE });
     });
     core.startDuel(duel);
     this.bots = setup.bots ?? [null, null];
-    for (const bot of this.bots) bot?.start(setup.lp, setup.decks);
+    for (const bot of this.bots) bot?.start(setup.lp, setup.decks, rules);
   }
 
   private bots: [WindBotPlayer | null, WindBotPlayer | null];

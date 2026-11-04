@@ -4,7 +4,7 @@ import type { OcgLocation, OcgResponse } from "ocgcore-wasm";
 import { DuelController } from "../engine/controller";
 import type { Fx } from "../engine/controller";
 import type { DuelMode } from "../engine/controller";
-import type { DeckList, FieldCard } from "../engine/protocol";
+import type { DeckList, DuelRules, FieldCard } from "../engine/protocol";
 import { LOC, PHASE } from "../lib/constants";
 import { CardDetail } from "../ui/CardDetail";
 import { CardImage } from "../ui/CardImage";
@@ -22,6 +22,8 @@ interface Props {
   human: number;
   names: [string, string];
   turnSeconds: number;
+  lp?: number;
+  rules?: DuelRules;
   onExit: () => void;
   onRematch: () => void;
 }
@@ -31,9 +33,9 @@ type Inspect = { code: number; actions: CardAction[] } | null;
 type Menu = { key: string; code: number; actions: CardAction[] } | null;
 type PileView = { player: number; location: number } | null;
 
-export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onRematch }: Props) {
+export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, rules, onExit, onRematch }: Props) {
   const db = useDb();
-  const controller = useMemo(() => new DuelController(db, mode, decks, human, turnSeconds), [db, mode, decks, human, turnSeconds]);
+  const controller = useMemo(() => new DuelController(db, mode, decks, human, turnSeconds, lp, rules), [db, mode, decks, human, turnSeconds, lp, rules]);
   useEffect(() => () => controller.dispose(), [controller]);
   const view = useSyncExternalStore(controller.subscribe, controller.getView);
   const [inspect, setInspectRaw] = useState<Inspect>(null);
@@ -212,7 +214,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
           <button className="tool" onClick={() => setShowLog(!showLog)} title="Journal">☰</button>
         </div>
         {handFor(1 - viewer, op.hand, true)}
-        <LpPlate name={label(1 - viewer)} lp={op.lp} active={!myTurn} side="op" thinking={view.thinking} />
+        <LpPlate name={label(1 - viewer)} lp={op.lp} max={lp} active={!myTurn} side="op" thinking={view.thinking} />
         <DamagePops fx={view.fx} player={1 - viewer} />
         {view.chat && view.chat.player !== viewer && <div key={view.chat.id} className="bot-chat">{view.chat.text}</div>}
       </div>
@@ -289,7 +291,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
 
       <div className="duel-bottom">
         {handFor(viewer, me.hand, false)}
-        <LpPlate name={label(viewer)} lp={me.lp} active={myTurn} side="me" />
+        <LpPlate name={label(viewer)} lp={me.lp} max={lp} active={myTurn} side="me" />
         <DamagePops fx={view.fx} player={viewer} />
       </div>
 
@@ -422,7 +424,7 @@ function actionKind(label: string): string {
   return "other";
 }
 
-function LpPlate({ name, lp, active, side, thinking }: { name: string; lp: number; active: boolean; side: "me" | "op"; thinking?: boolean }) {
+function LpPlate({ name, lp, max, active, side, thinking }: { name: string; lp: number; max: number; active: boolean; side: "me" | "op"; thinking?: boolean }) {
   const [shown, setShown] = useState(lp);
   const [hit, setHit] = useState(0);
   // Les LP défilent jusqu'à la nouvelle valeur, comme dans Master Duel.
@@ -435,11 +437,13 @@ function LpPlate({ name, lp, active, side, thinking }: { name: string; lp: numbe
   }, [lp, shown]);
   return (
     <div className={`lp-plate lp-${side} ${active ? "active" : ""}`}>
-      <div className="avatar">{name.slice(0, 1).toUpperCase()}</div>
+      {side === "me"
+        ? <img className="avatar avatar-img" src={`${import.meta.env.BASE_URL}img/duelist-icon.webp`} alt="" draggable={false} />
+        : <div className="avatar">{name.slice(0, 1).toUpperCase()}</div>}
       <div className="lp-body">
         <span className="pname">{name}{thinking && <span className="thinking-dots"> réfléchit<i>.</i><i>.</i><i>.</i></span>}</span>
         <span key={hit} className={`lp-value ${hit ? "lp-hit" : ""}`}><small>LP</small>{shown}</span>
-        <span className="lp-bar"><span style={{ width: `${Math.max(0, Math.min(100, (shown / 8000) * 100))}%` }} /></span>
+        <span className="lp-bar"><span style={{ width: `${Math.max(0, Math.min(100, (shown / max) * 100))}%` }} /></span>
       </div>
     </div>
   );

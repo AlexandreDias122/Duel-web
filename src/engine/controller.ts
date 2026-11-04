@@ -5,7 +5,7 @@ import type { OcgMessage, OcgResponse } from "ocgcore-wasm";
 import type { CardDb } from "../lib/cards";
 import { LOC, PHASE, PHASE_NAMES, POS } from "../lib/constants";
 import { cardKey } from "../ui/keys";
-import type { DeckList, DuelState, FromWorker, FromWorkerTagged, ToWorker } from "./protocol";
+import type { DeckList, DuelRules, DuelState, FromWorker, FromWorkerTagged, ToWorker } from "./protocol";
 
 export interface Prompt {
   id: number;
@@ -84,7 +84,7 @@ export class DuelController {
   view: DuelView = { loading: "Démarrage du moteur…", state: null, prompt: null, log: [], fx: [], thinking: false, end: null, error: null, clock: null, chat: null };
 
   /** turnSeconds : temps de réflexion par tour (0 = illimité). */
-  constructor(private db: CardDb, readonly mode: DuelMode, decks: [DeckList, DeckList], readonly human: number, private turnSeconds = 0) {
+  constructor(private db: CardDb, readonly mode: DuelMode, decks: [DeckList, DeckList], readonly human: number, private turnSeconds = 0, lp = 8000, rules?: DuelRules) {
     handlers.set(this.id, (m) => this.receive(m));
     const rand = () => String(Math.floor(Math.random() * 2 ** 31) + 1);
     const ai: [boolean, boolean] = mode === "ai" ? [human !== 0, human !== 1] : [false, false];
@@ -93,7 +93,7 @@ export class DuelController {
       duel: this.id,
       options: {
         base: new URL(import.meta.env.BASE_URL, location.href).href,
-        decks, ai, lp: 8000,
+        decks, ai, lp, rules,
         seed: [rand(), rand(), rand(), rand()],
       },
     });
@@ -218,7 +218,7 @@ export class DuelController {
 
   private fxFor(msg: OcgMessage, state: DuelState): FxInput[] {
     switch (msg.type) {
-      case T.NEW_TURN: return [{ kind: "banner", text: "Changement de tour", player: msg.player, big: true }];
+      case T.NEW_TURN: return [{ kind: "banner", text: this.mode === "solo" ? `Tour du joueur ${msg.player + 1}` : msg.player === this.human ? "Votre tour" : "Tour adverse", player: msg.player, big: true }];
       case T.NEW_PHASE: {
         const text = PHASE_BANNERS.find(([p]) => msg.phase & p)?.[1];
         return text ? [{ kind: "banner", text, player: state.turnPlayer }] : [];
@@ -299,8 +299,8 @@ function isArrival(msg: Extract<OcgMessage, { type: T.MOVE }>) {
 }
 
 const PHASE_BANNERS: [number, string][] = [
-  [PHASE.DRAW, "Phase de Pioche"], [PHASE.STANDBY, "Phase de Préparation"], [PHASE.MAIN1, "Phase Principale 1"],
-  [PHASE.BATTLE_START, "Phase de Combat"], [PHASE.MAIN2, "Phase Principale 2"], [PHASE.END, "Phase Finale"],
+  [PHASE.DRAW, "Draw Phase"], [PHASE.STANDBY, "Standby Phase"], [PHASE.MAIN1, "Main Phase 1"],
+  [PHASE.BATTLE_START, "Battle Phase"], [PHASE.MAIN2, "Main Phase 2"], [PHASE.END, "End Phase"],
 ];
 
 function pauseFor(msg: OcgMessage, state: DuelState): number {
