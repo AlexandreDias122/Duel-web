@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DuelMode } from "../engine/controller";
 import type { DeckList } from "../engine/protocol";
 import type { Deck } from "../lib/deck";
@@ -6,6 +6,18 @@ import { adaptToBanlist, parseYdk, validateDeck } from "../lib/deck";
 import { AI_DECKS } from "../engine/aiDecks";
 import { useBanlists, useDb } from "../ui/dbContext";
 import type { StarterDeck } from "./DecksScreen";
+import type { WindBotDeck } from "../engine/windbot";
+
+/** Decks WindBot disponibles (public/windbot/bots.json, absent si WindBot n'a pas été compilé). */
+let windbotDecks: Promise<WindBotDeck[]> | null = null;
+function loadWindBotDecks(): Promise<WindBotDeck[]> {
+  windbotDecks ??= fetch(`${import.meta.env.BASE_URL}windbot/bots.json`)
+    .then((r) => (r.ok ? (r.json() as Promise<WindBotDeck[]>) : []))
+    .catch(() => []);
+  return windbotDecks;
+}
+/** Deck WindBot proposé par défaut contre l'IA. */
+const DEFAULT_WINDBOT = "Maliss";
 
 export interface DuelConfig {
   mode: DuelMode;
@@ -41,7 +53,7 @@ interface Option {
   name: string;
   /** Nom court affiché pour l'IA. */
   label: string;
-  group: "mine" | "meta" | "starter";
+  group: "mine" | "meta" | "starter" | "windbot";
   list: DeckList;
   errors: string[];
   note?: string[];
@@ -53,6 +65,15 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
   const [saved] = useState(loadSettings);
   const [banlistName, setBanlistName] = useState(saved.banlist ?? banlists[0]?.name ?? "");
   const [timer, setTimer] = useState(saved.timer ?? 180);
+  const [bots, setBots] = useState<WindBotDeck[]>([]);
+  useEffect(() => {
+    if (mode !== "ai") return;
+    let live = true;
+    loadWindBotDecks().then((list) => live && setBots(list));
+    return () => {
+      live = false;
+    };
+  }, [mode]);
   const banlist = banlists.find((b) => b.name === banlistName) ?? null;
   // Les decks de démarrage et méta sont ajustés à la banlist choisie (cartes interdites remplacées).
   const adapted = (lists: { main: number[]; extra: number[] }) => {
@@ -65,15 +86,26 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
       const l = adapted(m);
       return { key: `m:${m.id}`, name: m.name, label: m.name, group: "meta", list: { main: l.main, extra: l.extra, profile: m.id }, errors: [], note: [m.blurb, ...l.note] };
     }),
+    ...bots.map((w): Option => ({
+      key: `w:${w.deck}`, name: `WindBot · ${w.name}${w.difficulty > 0 ? ` ${"★".repeat(Math.min(5, w.difficulty))}` : ""}`, label: w.name, group: "windbot",
+      list: { main: [], extra: [], windbot: w.deck }, errors: [],
+      note: ["WindBot joue son propre deck, avec un plan de jeu écrit pour lui (ni banlist, ni deck à choisir)."],
+    })),
     ...starters.map((s): Option => {
       const l = adapted(parseYdk(s.ydk));
       return { key: `s:${s.name}`, name: `${s.name} (démarrage)`, label: s.name, group: "starter", list: { main: l.main, extra: l.extra }, errors: [], note: l.note };
     }),
   ];
-  const [mine, setMine] = useState(options[0]?.key ?? "");
+  const [mine, setMine] = useState(options.find((o) => o.group !== "windbot")?.key ?? "");
   // Contre l'IA, on propose d'emblée un deck méta : c'est là qu'elle joue le mieux.
   const [theirs, setTheirs] = useState((mode === "ai" ? options.find((o) => o.group === "meta") : options[1])?.key ?? options[0]?.key ?? "");
   const [first, setFirst] = useState<"random" | "me" | "them">("random");
+  // Dès que la liste WindBot arrive, on la propose par défaut (tant que le joueur n'a rien choisi).
+  const [theirsTouched, setTheirsTouched] = useState(false);
+  useEffect(() => {
+    if (theirsTouched || !bots.length) return;
+    setTheirs(`w:${(bots.find((w) => w.deck === DEFAULT_WINDBOT) ?? bots[0]).deck}`);
+  }, [bots, theirsTouched]);
   const a = options.find((o) => o.key === mine);
   const b = options.find((o) => o.key === theirs);
 
@@ -90,7 +122,7 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
       // Le moteur fait toujours commencer l'équipe 0 : on place l'humain en conséquence.
       const human = meFirst ? 0 : 1;
       const decks: [DeckList, DeckList] = meFirst ? [a.list, b.list] : [b.list, a.list];
-      onStart({ mode, decks, human, turnSeconds, names: ["Vous", `IA (${b.label})`] });
+      onStart({ mode, decks, human, turnSeconds, names: ["Vous", b.group === "windbot" ? `WindBot (${b.label})` : `IA (${b.label})`] });
     } else {
       onStart(meFirst
         ? { mode, decks: [a.list, b.list], human: 0, turnSeconds, names: ["Joueur 1", "Joueur 2"] }
@@ -108,14 +140,17 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
       </header>
       <p className="muted">
         {mode === "ai"
-          ? "L'IA joue l'autre deck. Avec un deck méta, elle connaît ses combos et garde ses hand traps pour vos effets."
+          ? "Choisissez votre adversaire : WindBot (l'IA d'EDOPro, avec ses propres decks) ou l'IA maison avec le deck de votre choix."
           : "Vous contrôlez les deux joueurs : parfait pour tester des combos et des interactions."}
       </p>
       <label className="field-label">{mode === "ai" ? "Votre deck" : "Deck du joueur 1"}</label>
-      <DeckSelect options={options} value={mine} onChange={setMine} />
+      <DeckSelect options={options.filter((o) => o.group !== "windbot")} value={mine} onChange={setMine} />
       <DeckNotes o={a} />
-      <label className="field-label">{mode === "ai" ? "Deck de l'IA" : "Deck du joueur 2"}</label>
-      <DeckSelect options={options} value={theirs} onChange={setTheirs} />
+      <label className="field-label">{mode === "ai" ? "Adversaire" : "Deck du joueur 2"}</label>
+      <DeckSelect options={options} value={theirs} onChange={(v) => {
+        setTheirs(v);
+        setTheirsTouched(true);
+      }} />
       <DeckNotes o={b} />
       <label className="field-label">Qui commence ?</label>
       <div className="segmented">
@@ -135,12 +170,12 @@ export function DuelSetup({ mode, decks, starters, onStart, onBack }: Props) {
         ))}
       </div>
       {illegal && <div className="warn small">Un deck ne respecte pas la banlist ou les règles : corrigez-le dans l'éditeur ou choisissez « Aucune ».</div>}
-      <button className="primary big" disabled={!a || !b || !a.list.main.length || !b.list.main.length || illegal} onClick={start}>Lancer le duel</button>
+      <button className="primary big" disabled={!a || !b || !a.list.main.length || (!b.list.main.length && !b.list.windbot) || illegal} onClick={start}>Lancer le duel</button>
     </div>
   );
 }
 
-const GROUPS: [Option["group"], string][] = [["mine", "Mes decks"], ["meta", "Decks méta"], ["starter", "Decks de démarrage"]];
+const GROUPS: [Option["group"], string][] = [["windbot", "WindBot (ses propres decks)"], ["mine", "Mes decks"], ["meta", "Decks méta"], ["starter", "Decks de démarrage"]];
 
 function DeckSelect({ options, value, onChange }: { options: Option[]; value: string; onChange: (v: string) => void }) {
   return (

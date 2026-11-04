@@ -1,0 +1,46 @@
+<!--
+  WindBot Ignite (github.com/ProjectIgnis/windbot, AGPL-3.0) compilé en WebAssembly pour le navigateur.
+  Les sources d'origine sont récupérées dans upstream/ par scripts/build-windbot.sh ; seul le
+  dossier Bridge/ est propre à DuelWeb : il remplace le réseau et la base SQLite par des échanges
+  directs avec le moteur qui tourne dans le Web Worker.
+-->
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>WindBotWasm</AssemblyName>
+    <RootNamespace>WindBot</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <WarningLevel>0</WarningLevel>
+    <NoWarn>$(NoWarn);CA1416;CS0108;CS0114;CS0162;CS0168;CS0169;CS0219;CS0414;CS0618;CS0649;CS0659;CS0661;CS0672;CS1717;CS8981;SYSLIB0050;SYSLIB0051</NoWarn>
+    <!-- Fichiers servis tels quels par GitHub Pages (qui compresse lui-même). -->
+    <CompressionEnabled>false</CompressionEnabled>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <DebugType>none</DebugType>
+    <WasmEnableWebcil>true</WasmEnableWebcil>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+  </PropertyGroup>
+  <PropertyGroup>
+    <U>upstream</U>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Les executors sont trouvés par réflexion (attribut [Deck]) : rien ne doit être élagué. -->
+    <TrimmerRootAssembly Include="WindBotWasm" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Bridge/*.cs" />
+    <Compile Include="$(U)/ExecutorBase/**/*.cs" Exclude="$(U)/ExecutorBase/YGOSharp.OCGWrapper/NamedCardsManager.cs;$(U)/ExecutorBase/YGOSharp.OCGWrapper/CardsManager.cs" />
+    <Compile Include="$(U)/Game/AI/Deck.cs;$(U)/Game/AI/Decks/*.cs;$(U)/Game/DecksManager.cs;$(U)/Game/GameBehavior.cs;$(U)/Game/GamePacketFactory.cs;$(U)/Game/Room.cs" />
+    <Compile Include="$(U)/YGOSharp.Network/Enums/*.cs;$(U)/YGOSharp.Network/Utils/BinaryExtensions.cs" />
+    <EmbeddedResource Include="$(U)/Decks/*.ydk" LogicalName="Decks/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(U)/Dialogs/default.json" LogicalName="Dialogs/default.json" />
+    <EmbeddedResource Include="Dialogs/fr.json" LogicalName="Dialogs/fr.json" />
+  </ItemGroup>
+</Project>

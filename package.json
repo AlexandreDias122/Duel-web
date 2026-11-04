@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:ai": "tsx tests/ai-duel.ts"
+    "test:ai": "tsx tests/ai-duel.ts",
+    "windbot": "bash scripts/build-windbot.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",

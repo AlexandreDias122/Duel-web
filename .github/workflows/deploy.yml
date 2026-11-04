@@ -26,11 +26,17 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
       - run: npm ci
       - run: npm run data
+      # WindBot (C#) compilé en WebAssembly, servi dans public/windbot
+      - run: npm run windbot
       - run: npm run lint
       - run: npm run build
       - run: npm run test:ai -- 3
+      - run: npm run test:ai -- 3 windbot
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

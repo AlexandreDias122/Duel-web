@@ -6,6 +6,8 @@ export interface DeckList {
   extra: number[];
   /** Profil de jeu de l'IA pour ce deck (decks méta), voir aiDecks.ts. */
   profile?: string;
+  /** Executor WindBot qui joue ce deck : le worker remplace alors main/extra par la liste du bot. */
+  windbot?: string;
 }
 
 export interface FieldCard {
@@ -83,4 +85,6 @@ export type FromWorker =
   | { kind: "end"; winner: number; reason: string }
   /** L'IA réfléchit avant d'agir : l'interface marque une pause. */
   | { kind: "think"; ms: number }
+  /** Réplique de WindBot. */
+  | { kind: "chat"; player: number; text: string }
   | { kind: "error"; error: string };

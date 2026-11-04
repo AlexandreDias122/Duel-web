@@ -6,6 +6,8 @@ import { loadCardDb } from "../lib/cards";
 import type { CardDb } from "../lib/cards";
 import type { OcgCoreSync } from "ocgcore-wasm";
 import { DuelEngine } from "./duel";
+import { loadWindBot } from "./windbot";
+import type { WindBotPlayer } from "./windbot";
 import type { FromWorker, ToWorker } from "./protocol";
 
 const scripts = new Map<string, string | null>();
@@ -77,6 +79,22 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       post({ kind: "loading", text: "Chargement des cartes…" });
       const [db, baseScripts, core] = await load();
       if (current !== msg.duel) return;
+      // WindBot joue ses propres decks : on récupère la liste de l'executor choisi.
+      const bots: [WindBotPlayer | null, WindBotPlayer | null] = [null, null];
+      const decks = o.decks.map((d) => ({ ...d }));
+      if (decks.some((d) => d.windbot)) {
+        post({ kind: "loading", text: "Chargement de WindBot…" });
+        const wb = await loadWindBot(new URL("windbot/_framework/dotnet.js", base).href, db);
+        if (current !== msg.duel) return;
+        decks.forEach((d, p) => {
+          if (!d.windbot) return;
+          const bot = wb.create(d.windbot, p);
+          if (!bot) throw new Error(`Deck WindBot introuvable : ${d.windbot}`);
+          bots[p] = bot;
+          Object.assign(d, bot.deck());
+        });
+      }
+      o.decks = decks as typeof o.decks;
       post({ kind: "loading", text: "Chargement des scripts…" });
       const codes = [...o.decks[0].main, ...o.decks[0].extra, ...o.decks[1].main, ...o.decks[1].extra];
       await preload([...baseScripts, ...codes.map((c) => `c${c}.lua`)]);
@@ -88,6 +106,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         seed: o.seed.map(BigInt) as [bigint, bigint, bigint, bigint],
         readScript,
         baseScripts,
+        bots,
       }, post);
       engine.run();
     } else if (msg.kind === "respond") {

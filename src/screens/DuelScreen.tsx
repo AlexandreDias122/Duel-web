@@ -214,6 +214,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, onExit, onR
         {handFor(1 - viewer, op.hand, true)}
         <LpPlate name={label(1 - viewer)} lp={op.lp} active={!myTurn} side="op" thinking={view.thinking} />
         <DamagePops fx={view.fx} player={1 - viewer} />
+        {view.chat && view.chat.player !== viewer && <div key={view.chat.id} className="bot-chat">{view.chat.text}</div>}
       </div>
 
       <div className="duel-board">

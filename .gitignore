@@ -27,3 +27,9 @@ dist-ssr
 .data
 public/data
 public/scripts
+
+# WindBot : sources récupérées et binaires générés par scripts/build-windbot.sh
+windbot/upstream
+windbot/bin
+windbot/obj
+public/windbot
