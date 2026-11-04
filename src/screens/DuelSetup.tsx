@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DuelMode } from "../engine/controller";
-import type { DeckList } from "../engine/protocol";
+import type { DeckList, DuelRules } from "../engine/protocol";
 import type { Deck } from "../lib/deck";
 import { adaptToBanlist, parseYdk, validateDeck } from "../lib/deck";
 import { AI_DECKS } from "../engine/aiDecks";
@@ -27,6 +27,10 @@ export interface DuelConfig {
   human: number;
   /** Temps de réflexion par tour, en secondes (0 = illimité). */
   turnSeconds: number;
+  /** Points de vie de départ (8000 par défaut). */
+  lp?: number;
+  /** Main de départ, pioche, Master Rule, mélange. */
+  rules?: DuelRules;
 }
 
 const TIMERS: [number, string][] = [[0, "Aucun"], [60, "1 min"], [180, "3 min"], [300, "5 min"]];

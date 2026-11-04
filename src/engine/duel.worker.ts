@@ -103,6 +103,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         decks: o.decks,
         ai: o.ai,
         lp: o.lp,
+        rules: o.rules,
         seed: o.seed.map(BigInt) as [bigint, bigint, bigint, bigint],
         readScript,
         baseScripts,

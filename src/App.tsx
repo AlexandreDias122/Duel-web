@@ -11,6 +11,9 @@ import { DecksScreen } from "./screens/DecksScreen";
 import type { StarterDeck } from "./screens/DecksScreen";
 import { DuelScreen } from "./screens/DuelScreen";
 import { DuelSetup } from "./screens/DuelSetup";
+import { LobbyScreen } from "./screens/LobbyScreen";
+import { SoloScreen } from "./screens/SoloScreen";
+import type { DeckOption, SoloSettings } from "./screens/solo/options";
 import type { DuelConfig } from "./screens/DuelSetup";
 import type { DuelMode } from "./engine/controller";
 import { warmupEngine } from "./engine/controller";
@@ -21,6 +24,8 @@ type Route =
   | { name: "account" }
   | { name: "editor"; id: string }
   | { name: "setup"; mode: DuelMode }
+  | { name: "solo" }
+  | { name: "lobby"; opponent: DeckOption; settings: SoloSettings }
   | { name: "duel"; config: DuelConfig; round: number };
 
 const BASE = new URL(import.meta.env.BASE_URL, location.href);
@@ -90,6 +95,16 @@ export default function App() {
     case "account":
       content = <AccountScreen account={account} deckCount={decks.length} onBack={() => setRoute({ name: "home" })} />;
       break;
+    case "solo":
+      content = <SoloScreen decks={decks} starters={data.starters} onBack={() => setRoute({ name: "home" })}
+        onStart={(opponent, settings) => setRoute({ name: "lobby", opponent, settings })} />;
+      break;
+    case "lobby":
+      content = <LobbyScreen opponent={route.opponent} settings={route.settings} decks={decks} starters={data.starters}
+        playerName={account.user?.email?.split("@")[0] || "Duelliste"}
+        onBack={() => setRoute({ name: "solo" })} onEditDecks={() => setRoute({ name: "decks" })}
+        onStart={(config) => setRoute({ name: "duel", config, round: 1 })} />;
+      break;
     case "setup":
       content = <DuelSetup mode={route.mode} decks={decks} starters={data.starters} onBack={() => setRoute({ name: "home" })}
         onStart={(config) => setRoute({ name: "duel", config, round: 1 })} />;
@@ -127,7 +142,7 @@ function Home({ go, deckCount, account }: { go: (r: Route) => void; deckCount: n
   const [hero] = useState(() => HERO_CARDS[Math.floor(Math.random() * HERO_CARDS.length)]);
   const [heroOk, setHeroOk] = useState(true);
   const items: { label: string; sub: string; route: Route }[] = [
-    { label: "SOLO", sub: "Duel contre l'IA", route: { name: "setup", mode: "ai" } },
+    { label: "SOLO", sub: "Duel contre l'IA", route: { name: "solo" } },
     { label: "DUEL LIBRE", sub: "Jouez les deux côtés", route: { name: "setup", mode: "solo" } },
     { label: "DECK", sub: `${deckCount} deck(s) · éditeur`, route: { name: "decks" } },
     ...(account.enabled

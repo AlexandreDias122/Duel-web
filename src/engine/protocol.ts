@@ -59,6 +59,20 @@ export interface DuelState {
   solving: number;
 }
 
+/** Réglages du duel (écran SOLO). */
+export interface DuelRules {
+  /** Main de départ. */
+  startHand: number;
+  /** Cartes piochées à chaque tour. */
+  drawCount: number;
+  /** Master Rule (5 = Nouvelles Master Rules). */
+  masterRule: 3 | 4 | 5;
+  /** Mélanger les decks au début du duel. */
+  shuffle: boolean;
+}
+
+export const DEFAULT_RULES: DuelRules = { startHand: 5, drawCount: 1, masterRule: 5, shuffle: true };
+
 export interface StartOptions {
   base: string;
   decks: [DeckList, DeckList];
@@ -66,6 +80,7 @@ export interface StartOptions {
   ai: [boolean, boolean];
   seed: [string, string, string, string];
   lp: number;
+  rules?: DuelRules;
 }
 
 export type ToWorker =

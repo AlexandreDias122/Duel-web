@@ -4,7 +4,8 @@
 import { OcgDuelMode } from "ocgcore-wasm";
 import type { CardDb } from "../lib/cards";
 import { LOC, POS, TYPE } from "../lib/constants";
-import type { DeckList } from "./protocol";
+import { DEFAULT_RULES } from "./protocol";
+import type { DeckList, DuelRules } from "./protocol";
 
 /** Deck WindBot proposé dans l'appli (liste générée par scripts/build-windbot.sh). */
 export interface WindBotDeck {
@@ -14,6 +15,12 @@ export interface WindBotDeck {
   deck: string;
   /** 1 (facile) à 5 (difficile), d'après Project Ignis. */
   difficulty: number;
+  /** Carte phare (illustration de l'écran SOLO). */
+  cover?: number;
+  /** Description du deck. */
+  blurb?: string;
+  /** L'executor préfère commencer en second. */
+  goSecond?: boolean;
 }
 
 interface Exports {
@@ -119,16 +126,19 @@ export class WindBotPlayer {
   }
 
   /** Paquets d'ouverture : salle (règles MR5) puis MSG_START. */
-  start(lp: number, decks: [DeckList, DeckList]) {
+  start(lp: number, decks: [DeckList, DeckList], rules: DuelRules = DEFAULT_RULES) {
+    const flags = { 3: OcgDuelMode.MODE_MR3, 4: OcgDuelMode.MODE_MR4, 5: OcgDuelMode.MODE_MR5 }[rules.masterRule];
     const join = new DataView(new ArrayBuffer(1 + 56));
     let o = 0;
     join.setUint8(o++, STOC_JOIN_GAME);
     o += 4 + 1 + 1; // lflist, rule, mode
-    join.setUint8(o++, 5); // duel_rule
-    o += 2 + 3; // nocheck, noshuffle, alignement
+    join.setUint8(o++, rules.masterRule); // duel_rule
+    o += 1; // nocheck
+    join.setUint8(o++, rules.shuffle ? 0 : 1); // noshuffle
+    o += 3; // alignement
     join.setUint32(o, lp, true); o += 4;
-    join.setUint8(o++, 5);
-    join.setUint8(o++, 1);
+    join.setUint8(o++, rules.startHand);
+    join.setUint8(o++, rules.drawCount);
     join.setUint16(o, 0, true); o += 2;
     o += 4;
     join.setUint32(o, 4043399681, true); o += 4; // SERVER_HANDSHAKE
@@ -136,7 +146,7 @@ export class WindBotPlayer {
     join.setInt32(o, 1, true); o += 4;
     join.setInt32(o, 1, true); o += 4;
     join.setInt32(o, 1, true); o += 4; // best_of
-    join.setInt32(o, Number(OcgDuelMode.MODE_MR5 & 0xffffffffn), true); o += 4;
+    join.setInt32(o, Number(flags & 0xffffffffn), true); o += 4;
     this.send(new Uint8Array(join.buffer));
 
     const start = new DataView(new ArrayBuffer(2 + 1 + 8 + 8));
