@@ -28,11 +28,16 @@ export type Fx = { id: number } & (
   | { kind: "bury"; code: number; player: number; from: number; seq: number; fromKey: string | null; to: string; banish: boolean; faceDown: boolean }
   /** Carte qui glisse d'une pile (main, deck, Extra Deck…) jusqu'à sa zone. */
   | { kind: "fly"; code: number; player: number; from: number; seq: number; to: string; faceDown: boolean }
+  /**
+   * Tout autre déplacement : pioche, ajout à la main, retour au Deck, Cimetière → bannis…
+   * Les extrémités sont une zone (« zone:clé »), une pile (« pile:joueur-lieu ») ou une carte de la main (« hand:joueur-index »).
+   */
+  | { kind: "travel"; code: number; owner: number; from: string; to: string; fromLoc: number; toLoc: number; faceDown: boolean; delay: number }
 );
 type FxInput = Fx extends infer F ? (F extends Fx ? Omit<F, "id"> : never) : never;
 
 const FX_LIFETIME: Record<Fx["kind"], number> = {
-  activate: 1100, summon: 900, spsummon: 1100, flip: 800, set: 600, banner: 1200, chain: 1300, resolve: 900, attack: 900, damage: 1300, leave: 700, fly: 700, bury: 1200,
+  activate: 1100, summon: 900, spsummon: 1100, flip: 800, set: 600, banner: 1200, chain: 1300, resolve: 900, attack: 900, damage: 1300, leave: 700, fly: 700, bury: 1200, travel: 900,
 };
 
 export interface DuelView {
@@ -49,6 +54,8 @@ export interface DuelView {
   clock: number | null;
   /** Dernière réplique de WindBot, affichée quelques secondes. */
   chat: { id: number; player: number; text: string } | null;
+  /** Cartes face cachée déjà révélées (clé de zone) : on peut les consulter même chez l'adversaire. */
+  known: ReadonlySet<string>;
 }
 
 // Un seul worker pour toute la session : le moteur et les cartes restent chargés entre deux duels.
@@ -83,7 +90,7 @@ export class DuelController {
   private fxId = 0;
   private promptId = 0;
   private chatId = 0;
-  view: DuelView = { loading: "Démarrage du moteur…", state: null, prompt: null, log: [], fx: [], thinking: false, end: null, error: null, clock: null, chat: null };
+  view: DuelView = { loading: "Démarrage du moteur…", state: null, prompt: null, log: [], fx: [], thinking: false, end: null, error: null, clock: null, chat: null, known: new Set() };
 
   /** turnSeconds : temps de réflexion par tour (0 = illimité). */
   constructor(private db: CardDb, readonly mode: DuelMode, decks: [DeckList, DeckList], readonly human: number, private turnSeconds = 0, lp = 8000, rules?: DuelRules) {
@@ -180,14 +187,17 @@ export class DuelController {
       } else if (m.kind === "update") {
         const log = [...this.view.log];
         const fx: FxInput[] = [];
+        let known: Set<string> | null = null;
         for (const msg of m.messages) {
+          const k = trackKnown(msg, known ?? this.view.known);
+          if (k) known = k;
           const line = this.describe(msg);
           if (line) log.push(line);
           const f = this.fxFor(msg, m.state);
           fx.push(...f);
           pause += pauseFor(msg, m.state);
         }
-        this.set({ state: m.state, loading: null, thinking: false, log: log.slice(-200) });
+        this.set({ state: m.state, loading: null, thinking: false, log: log.slice(-200), ...(known ? { known } : {}) });
         fx.forEach((f) => this.addFx(f));
         pause = Math.min(pause, 2200);
       } else if (m.kind === "chat") {
@@ -245,7 +255,15 @@ export class DuelController {
         }];
       case T.DAMAGE: case T.PAY_LPCOST: return msg.amount ? [{ kind: "damage", player: msg.player, amount: msg.amount, heal: false }] : [];
       case T.RECOVER: return msg.amount ? [{ kind: "damage", player: msg.player, amount: msg.amount, heal: true }] : [];
+      case T.DRAW: {
+        const hand = state.players[msg.player].hand.length;
+        return msg.drawn.map((d, i) => ({
+          kind: "travel", code: d.code, owner: msg.player, from: `pile:${msg.player}-${LOC.DECK}`, to: `hand:${msg.player}-${hand - msg.drawn.length + i}`,
+          fromLoc: LOC.DECK, toLoc: LOC.HAND, faceDown: true, delay: i * 110,
+        }));
+      }
       case T.MOVE:
+        if (msg.from.location & LOC.OVERLAY || msg.to.location & LOC.OVERLAY) return [];
         if (isArrival(msg))
           return [{
             kind: "fly", code: msg.card, player: msg.from.controller, from: msg.from.location, seq: msg.from.sequence,
@@ -261,7 +279,14 @@ export class DuelController {
           };
           return fromKey && msg.card ? [{ kind: "leave", code: msg.card, key: fromKey }, bury] : [bury];
         }
-        return [];
+        {
+          const from = endpoint(msg.from), to = endpoint(msg.to);
+          if (!from || !to || from === to) return [];
+          return [{
+            kind: "travel", code: msg.card, owner: msg.to.controller, from, to, fromLoc: msg.from.location, toLoc: msg.to.location,
+            faceDown: (msg.to.position & POS.FACEDOWN) !== 0 || (msg.to.location & LOC.DECK) !== 0, delay: 0,
+          }];
+        }
       default: return [];
     }
   }
@@ -308,6 +333,39 @@ function isArrival(msg: Extract<OcgMessage, { type: T.MOVE }>) {
     && !(msg.to.location & LOC.OVERLAY);
 }
 
+/** Extrémité d'un déplacement animé (voir l'effet « travel »). */
+function endpoint(l: { controller: number; location: number; sequence: number }): string | null {
+  if (l.location & (LOC.MZONE | LOC.SZONE)) return `zone:${cardKey(l.controller, l.location & (LOC.MZONE | LOC.SZONE), l.sequence)}`;
+  if (l.location & LOC.HAND) return `hand:${l.controller}-${l.sequence}`;
+  for (const loc of [LOC.DECK, LOC.EXTRA, LOC.GRAVE, LOC.REMOVED]) if (l.location & loc) return `pile:${l.controller}-${loc}`;
+  return null;
+}
+
+/**
+ * Suit les cartes face cachée que le joueur a déjà vues : révélées (confirm), ou retournées face cachée sous ses yeux.
+ * Renvoie un nouvel ensemble s'il change, sinon null.
+ */
+function trackKnown(msg: OcgMessage, known: ReadonlySet<string>): Set<string> | null {
+  const field = (c: { controller: number; location: number; sequence: number }) =>
+    c.location & (LOC.MZONE | LOC.SZONE) && !(c.location & LOC.OVERLAY) ? cardKey(c.controller, c.location & (LOC.MZONE | LOC.SZONE), c.sequence) : null;
+  const next = new Set(known);
+  if (msg.type === T.CONFIRM_CARDS) msg.cards.forEach((c) => { const k = field(c); if (k) next.add(k); });
+  else if (msg.type === T.POS_CHANGE) {
+    const k = field(msg);
+    if (k && msg.prev_position & POS.FACEUP && msg.position & POS.FACEDOWN) next.add(k);
+  } else if (msg.type === T.MOVE) {
+    const from = field(msg.from), to = field(msg.to);
+    const wasKnown = from ? next.has(from) : false;
+    if (from) next.delete(from);
+    if (to) {
+      next.delete(to);
+      // Une carte qui change de zone sur le terrain reste connue ; une carte face visible posée face cachée aussi.
+      if (msg.to.position & POS.FACEDOWN && (wasKnown || (from && msg.from.position & POS.FACEUP))) next.add(to);
+    }
+  } else return null;
+  return next.size === known.size && [...next].every((k) => known.has(k)) ? null : next;
+}
+
 const PHASE_BANNERS: [number, string][] = [
   [PHASE.DRAW, "Draw Phase"], [PHASE.STANDBY, "Standby Phase"], [PHASE.MAIN1, "Main Phase 1"],
   [PHASE.BATTLE_START, "Battle Phase"], [PHASE.MAIN2, "Main Phase 2"], [PHASE.END, "End Phase"],
@@ -328,10 +386,11 @@ function pauseFor(msg: OcgMessage, state: DuelState): number {
     case T.MOVE:
       if (isArrival(msg)) return 520;
       if (msg.to.location & (LOC.GRAVE | LOC.REMOVED)) return msg.from.location & (LOC.MZONE | LOC.SZONE) ? 600 : 380;
+      if (msg.to.location & (LOC.HAND | LOC.DECK | LOC.EXTRA)) return 420;
       return 200;
     case T.SET: return 400;
     case T.POS_CHANGE: return 300;
-    case T.DRAW: return 300;
+    case T.DRAW: return Math.min(1100, 330 + msg.drawn.length * 110);
     case T.SHUFFLE_HAND: case T.SHUFFLE_DECK: return 200;
     default: return 0;
   }

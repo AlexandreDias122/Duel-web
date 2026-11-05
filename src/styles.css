@@ -967,7 +967,7 @@ select, input.search, .filters input {
 
 /* ===== Terrain façon Master Duel : zones aux emplacements du plateau 3D (forêt) =====
    --u = taille en px d'une unité du modèle 3D ; positions des zones dans Field.tsx (SLOT). */
-.duel { isolation: isolate; }
+.duel { isolation: isolate; overflow: clip; }
 .board-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
 .tool-off { opacity: 0.45; }
 .duel-board {
@@ -1062,3 +1062,118 @@ select, input.search, .filters input {
 }
 .has-3d .clock span { display: none; }
 .has-3d .clock.low { text-shadow: 0 0 6px #ff4d6d, 0 1px 0 #000; }
+
+/* ===== Retours Master Duel : sélection jaune, piles jouables, pioche ===== */
+/* Main centrée sous le plateau et cartes plus grandes */
+.duel-wide .duel-bottom .hand, .duel-wide .duel-bottom .hand:not(#_) { translate: 0 40%; }
+.duel-wide .duel-bottom .hand-card, .duel-wide .duel-bottom .hand-card .card-img { width: calc(var(--cw) * 1.32); }
+.duel-wide .duel-bottom .hand-card { margin-left: calc(var(--cw) * -0.26); }
+.duel-wide .duel-bottom .hand-card:first-child { margin-left: 0; }
+.duel-wide .duel-top .hand-top .hand-card, .duel-wide .duel-top .hand-top .hand-card .card-img { width: calc(var(--cw) * 0.72); }
+.duel-bottom .hand-card, .duel-bottom .hand-card .card-img { width: calc(var(--cw) * 1.42); }
+.duel-bottom .hand { min-height: calc(var(--cw) * 1.42 * 1.46 + 14px); }
+.field .fcard { width: calc(var(--cw) * 0.88); }
+.hand-card.hand-arriving { visibility: hidden; }
+.travel-card { z-index: 32; }
+
+/* Cartes jouables : liseré jaune qui scintille, comme dans Master Duel */
+.zone-actionable .fcard, .hand-card.zone-actionable .card-img, .pile.zone-actionable .pile-stack {
+  box-shadow: 0 0 0 2px #fff27a, 0 0 10px 3px #ffd23a, 0 0 22px 6px rgba(255, 170, 30, 0.7);
+  animation: md-playable 1.2s ease-in-out infinite;
+}
+@keyframes md-playable {
+  0%, 100% { filter: brightness(1); box-shadow: 0 0 0 2px #fff27a, 0 0 8px 2px #ffd23a, 0 0 18px 4px rgba(255, 170, 30, 0.55); }
+  50% { filter: brightness(1.12); box-shadow: 0 0 0 2px #fffbd0, 0 0 14px 4px #ffe14a, 0 0 28px 8px rgba(255, 190, 40, 0.85); }
+}
+
+/* Zones à choisir : cadre jaune et carrés qui se resserrent (choix d'une zone pour invoquer, poser, activer) */
+.zone-selectable::before, .has-3d .zone-selectable::before, .field .zone-selectable::before {
+  background: rgba(255, 236, 90, 0.16) !important; opacity: 1 !important; filter: none !important; animation: none;
+  border: 2px solid #fff36b; border-radius: 2px; box-shadow: 0 0 10px #ffe14a, inset 0 0 12px rgba(255, 225, 70, 0.6);
+  clip-path: none;
+}
+.zone-selectable::after, .has-3d .zone-selectable::after { display: none !important; }
+.zone-chosen::before, .has-3d .zone-chosen::before { background: rgba(255, 255, 220, 0.5) !important; opacity: 1 !important; border: 2px solid #fff; }
+.sel-squares { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.sel-squares i {
+  position: absolute; inset: 0; border: 2px solid #fff36b; box-shadow: 0 0 6px #ffd23a; border-radius: 2px;
+  animation: md-squares 1.5s linear infinite; opacity: 0;
+}
+.sel-squares i:nth-child(2) { animation-delay: -0.5s; }
+.sel-squares i:nth-child(3) { animation-delay: -1s; }
+@keyframes md-squares { 0% { transform: scale(1.12); opacity: 0; } 20% { opacity: 1; } 100% { transform: scale(0.55); opacity: 0; } }
+.field:has(.zone-selectable) .zone-selectable { z-index: 4; }
+/* Cible d'un effet sur le terrain */
+.zone-target .fcard, .hand-card.zone-target .card-img { box-shadow: 0 0 0 2px #fff36b, 0 0 14px 4px #ffd23a; animation: md-playable 1s ease-in-out infinite; }
+
+/* Cimetière / bannis jouables : anneau jaune autour du socle ; Extra Deck : liseré et étincelles */
+.pile-ring {
+  position: absolute; left: 50%; top: 50%; width: calc(var(--u, 8px) * 7.6); aspect-ratio: 1; translate: -50% -50%; z-index: 0; pointer-events: none;
+  border-radius: 50%; box-shadow: 0 0 0 calc(var(--u, 8px) * 0.35) #ffe14a, 0 0 calc(var(--u, 8px) * 1.6) calc(var(--u, 8px) * 0.5) rgba(255, 200, 40, 0.85), inset 0 0 calc(var(--u, 8px) * 1.2) rgba(255, 220, 80, 0.8);
+  animation: md-ring-pulse 1.3s ease-in-out infinite;
+}
+.pile-ring i {
+  position: absolute; inset: -12%; border-radius: 50%; border: 2px dashed rgba(255, 245, 160, 0.85); animation: md-ring-turn 6s linear infinite;
+}
+.pile-ring i + i { inset: -24%; border: none; background: radial-gradient(circle, transparent 58%, rgba(255, 225, 90, 0.35) 66%, transparent 72%); animation: md-ring-out 1.3s ease-out infinite; }
+.pile-ring-card { width: calc(var(--cw) * 0.95); aspect-ratio: 1 / 1.46; border-radius: 4px; rotate: inherit; box-shadow: 0 0 0 2px #ffe14a, 0 0 18px 6px rgba(255, 180, 30, 0.75); }
+.pile-extra .pile-ring-card { rotate: 20deg; }
+.pile-deck .pile-ring-card { rotate: -20deg; }
+.pile-ring-card i { border-radius: 4px; inset: -6%; border-style: solid; border-width: 1px; }
+.pile-ring-card i + i { inset: -18%; border-radius: 8px; background: none; box-shadow: 0 0 14px 2px rgba(255, 220, 80, 0.6); }
+@keyframes md-ring-pulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+@keyframes md-ring-turn { to { rotate: 360deg; } }
+@keyframes md-ring-out { 0% { transform: scale(0.8); opacity: 0.9; } 100% { transform: scale(1.15); opacity: 0; } }
+.pile.zone-actionable { z-index: 3; }
+
+/* Bouton rond « Activer Effet » / « Invocation Spéciale » au-dessus de la pile */
+.pile-menu-backdrop { background: rgba(0, 0, 0, 0.18); }
+.pile-menu { position: fixed; translate: -50% -100%; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-bottom: 6px; animation: chat-in 0.18s ease-out; }
+.pile-act { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; padding: 0; color: #fff; cursor: pointer; }
+.pile-act-icon {
+  width: 64px; height: 64px; border-radius: 50%; position: relative;
+  background: radial-gradient(circle at 50% 40%, #26301a, #0b0f07 70%); box-shadow: 0 0 0 3px #b8ec3a, 0 0 0 5px rgba(20, 30, 10, 0.9), 0 0 16px rgba(190, 240, 60, 0.6);
+}
+.pile-act-icon::before {
+  content: ""; position: absolute; inset: 14px; background: #d6f23a;
+  clip-path: polygon(50% 0, 60% 22%, 82% 8%, 76% 34%, 100% 40%, 78% 52%, 70% 52%, 74% 64%, 30% 64%, 30% 52%, 22% 52%, 0 40%, 24% 34%, 18% 8%, 40% 22%);
+}
+.pile-act-icon::after { content: ""; position: absolute; left: 22px; right: 22px; bottom: 13px; height: 10px; border: 3px solid #d6f23a; border-top: none; transform: perspective(30px) rotateX(30deg); }
+.pile-act-special .pile-act-icon::before { clip-path: polygon(10% 0, 30% 0, 34% 40%, 44% 0, 56% 0, 66% 40%, 70% 0, 90% 0, 80% 64%, 20% 64%); }
+.pile-act-label { font-size: 15px; font-weight: 700; text-shadow: 0 1px 3px #000, 0 0 8px #000; white-space: nowrap; }
+.pile-act:active .pile-act-icon { transform: scale(0.94); }
+.pile-browse { font-size: 12px; padding: 4px 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.65); border: 1px solid rgba(255, 255, 255, 0.25); color: #fff; }
+
+/* Fenêtre de choix façon Master Duel */
+.md-dialog-backdrop { display: flex; align-items: center; justify-content: center; }
+.md-dialog {
+  width: min(92vw, 780px); max-height: 88dvh; display: flex; flex-direction: column; gap: 14px; padding: 18px 16px 16px; position: relative;
+  background: linear-gradient(180deg, rgba(20, 22, 24, 0.97), rgba(8, 9, 10, 0.97)); border-top: 2px solid #3a3d40; animation: chat-in 0.2s ease-out;
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+}
+.md-dialog-title { text-align: center; font-size: clamp(15px, 2.6vw, 22px); font-weight: 700; color: #fff; }
+.md-dialog-cards {
+  display: flex; gap: 12px; justify-content: safe center; overflow-x: auto; padding: 12px; border-radius: 4px;
+  background: linear-gradient(180deg, #1e3f9e, #173480); box-shadow: inset 0 0 0 2px #2c55c8;
+}
+.md-dialog-card { flex: none; width: clamp(64px, 14vw, 110px); padding: 0; border: none; background: none; position: relative; cursor: pointer; border-radius: 3px; }
+.md-dialog-card .card-img { width: 100%; display: block; border-radius: 3px; }
+.md-dialog-card.on { box-shadow: 0 0 0 3px #fff36b, 0 0 16px 4px #ffd23a; }
+.md-dialog-info { position: absolute; right: 2px; top: 2px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 14px; line-height: 22px; }
+.md-dialog-actions { display: flex; gap: 14px; justify-content: center; }
+.md-btn {
+  flex: 1; max-width: 280px; padding: 12px; font-size: 17px; font-weight: 700; color: #d6f23a; background: #0a0b0c;
+  border: 2px solid #4a4d50; border-radius: 10px; position: relative;
+}
+.md-btn::before { content: ""; position: absolute; left: -2px; top: -2px; width: 18px; height: 18px; background: #b8ec3a; clip-path: polygon(0 0, 100% 0, 0 100%); border-top-left-radius: 8px; }
+.md-btn:disabled { color: #7d8b3a; }
+/* La main ne doit pas bloquer les touches sur l'Extra Deck et le Deck qu'elle chevauche : seules ses cartes réagissent. */
+.duel-wide .duel-bottom .hand, .duel-wide .duel-bottom .hand:not(#_), .duel-wide .duel-top .hand-top { pointer-events: none; }
+.duel-wide .hand .hand-card { pointer-events: auto; }
+/* Cimetière et bannis : le compteur se pose dans le trou du socle, l'anneau jaune sur son rebord (le socle est surélevé). */
+.pile-gy .pile-label, .pile-ban .pile-label { bottom: auto; top: 50%; translate: -50% -50%; }
+.has-3d .pile-gy .pile-label, .has-3d .pile-ban .pile-label { translate: -50% calc(-50% - var(--u) * 0.9); }
+.has-3d .pile-gy .pile-ring, .has-3d .pile-ban .pile-ring { width: calc(var(--u) * 6.6); translate: -50% calc(-50% - var(--u) * 0.9); }
+.pile-ring:not(.pile-ring-card) { background: radial-gradient(circle, transparent 52%, rgba(255, 230, 90, 0.55) 60%, rgba(255, 210, 60, 0.15) 68%, transparent 71%); }
+/* Consigne de choix de zone : sous la main adverse, pas dessus */
+.duel-wide .duel-board > .banner { top: calc(var(--cw) * 1.15 + 6px); }
