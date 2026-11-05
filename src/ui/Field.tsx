@@ -4,6 +4,7 @@ import { LOC, POS, TYPE } from "../lib/constants";
 import { CardImage } from "./CardImage";
 
 import { cardKey } from "./keys";
+import { MAT_HALF_D, MAT_HALF_W } from "./matGeometry";
 
 export interface FieldProps {
   state: DuelState;
@@ -25,33 +26,48 @@ export interface FieldProps {
   chainAt: Map<string, number>;
 }
 
+/**
+ * Emplacements du plateau 3D (unités du modèle, repère du joueur : x vers la droite, z vers l'adversaire),
+ * relevés sur le plateau d'origine ; ceux de l'adversaire sont les mêmes, tournés d'un demi-tour.
+ */
+const PITCH = 8.6;
+const SLOT = {
+  monster: (i: number) => [-2 * PITCH + i * PITCH, -9.5],
+  spell: (i: number) => [-2 * PITCH + i * PITCH, -18],
+  field: [-25, -9.9],
+  emzLeft: [-PITCH, 0],
+  emzRight: [PITCH, 0],
+  grave: [25.74, -14.26],
+  banish: [27.58, -7.9],
+  deck: [26.6, -23.5],
+  extra: [-26.6, -23.5],
+} as const;
+
 export function Field(p: FieldProps) {
   const me = p.viewer;
   const op = 1 - me;
   const cells: ReactElement[] = [];
-  const add = (row: number, col: number, el: ReactElement | null) => {
-    if (el) cells.push(<div key={`${row}-${col}`} style={{ gridRow: row, gridColumn: col }} className="cell">{el}</div>);
+  const add = (key: string, [x, z]: readonly number[], mine: boolean, el: ReactElement | null) => {
+    if (!el) return;
+    const [vx, vz] = mine ? [x, z] : [-x, -z];
+    const style = { left: `calc(var(--u) * ${vx + MAT_HALF_W})`, top: `calc(var(--u) * ${MAT_HALF_D - vz})` };
+    cells.push(<div key={key} style={style} className="cell">{el}</div>);
   };
 
-  // Adversaire (tourné à 180° : sa zone 0 est à notre droite)
-  add(1, 1, <Pile {...p} player={op} location={LOC.DECK} />);
-  for (let i = 0; i < 5; i++) add(1, 6 - i, <Zone {...p} player={op} location={LOC.SZONE} seq={i} />);
-  add(1, 7, <Pile {...p} player={op} location={LOC.EXTRA} />);
-  add(2, 1, <Pile {...p} player={op} location={LOC.GRAVE} />);
-  for (let i = 0; i < 5; i++) add(2, 6 - i, <Zone {...p} player={op} location={LOC.MZONE} seq={i} />);
-  add(2, 7, <Zone {...p} player={op} location={LOC.SZONE} seq={5} />);
+  for (const [pl, mine] of [[me, true], [op, false]] as const) {
+    for (let i = 0; i < 5; i++) {
+      add(`m${pl}-${i}`, SLOT.monster(i), mine, <Zone {...p} player={pl} location={LOC.MZONE} seq={i} />);
+      add(`s${pl}-${i}`, SLOT.spell(i), mine, <Zone {...p} player={pl} location={LOC.SZONE} seq={i} />);
+    }
+    add(`f${pl}`, SLOT.field, mine, <Zone {...p} player={pl} location={LOC.SZONE} seq={5} />);
+    add(`g${pl}`, SLOT.grave, mine, <Pile {...p} player={pl} location={LOC.GRAVE} />);
+    add(`b${pl}`, SLOT.banish, mine, <Pile {...p} player={pl} location={LOC.REMOVED} />);
+    add(`d${pl}`, SLOT.deck, mine, <Pile {...p} player={pl} location={LOC.DECK} />);
+    add(`e${pl}`, SLOT.extra, mine, <Pile {...p} player={pl} location={LOC.EXTRA} />);
+  }
   // Zones Monstre Extra : à gauche = ma zone 5 / zone 6 adverse
-  add(3, 1, <Pile {...p} player={op} location={LOC.REMOVED} />);
-  add(3, 3, <ExtraZone {...p} left />);
-  add(3, 5, <ExtraZone {...p} left={false} />);
-  add(3, 7, <Pile {...p} player={me} location={LOC.REMOVED} />);
-  // Moi
-  add(4, 1, <Zone {...p} player={me} location={LOC.SZONE} seq={5} />);
-  for (let i = 0; i < 5; i++) add(4, 2 + i, <Zone {...p} player={me} location={LOC.MZONE} seq={i} />);
-  add(4, 7, <Pile {...p} player={me} location={LOC.GRAVE} />);
-  add(5, 1, <Pile {...p} player={me} location={LOC.EXTRA} />);
-  for (let i = 0; i < 5; i++) add(5, 2 + i, <Zone {...p} player={me} location={LOC.SZONE} seq={i} />);
-  add(5, 7, <Pile {...p} player={me} location={LOC.DECK} />);
+  add("emz-l", SLOT.emzLeft, true, <ExtraZone {...p} left />);
+  add("emz-r", SLOT.emzRight, true, <ExtraZone {...p} left={false} />);
 
   return (
     <div className="mat-wrap">
@@ -142,7 +158,7 @@ function Pile(p: FieldProps & { player: number; location: number }) {
   return (
     <div className={`pile ${actionable ? "zone-actionable" : ""} ${p.player !== p.viewer ? "zone-opp" : ""}`} data-pile={`${p.player}-${p.location}`} onClick={() => p.onPile(p.player, p.location)}>
       <div className={`socket socket-${p.location === LOC.GRAVE ? "gy" : p.location === LOC.REMOVED ? "ban" : p.location === LOC.EXTRA ? "extra" : "deck"}`} />
-      {count > 0 && <div className={`pile-stack ${faceUp ? "" : "pile-thick"}`}><CardImage code={top?.code ?? 0} art={faceUp} back={!faceUp && !(top && top.position & POS.FACEUP)} /></div>}
+      {count > 0 && <div className={`pile-stack ${faceUp ? "" : "pile-thick"}`}><CardImage code={top?.code ?? 0} back={!faceUp && !(top && top.position & POS.FACEUP)} /></div>}
       <div className="pile-label">{label} <b>{count}</b></div>
     </div>
   );

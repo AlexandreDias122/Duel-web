@@ -43,9 +43,11 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   const [inspect, setInspectRaw] = useState<Inspect>(null);
   // Écran large (paysage, tablette, ordinateur) : fiche de la carte affichée en permanence à gauche, comme dans Master Duel.
   const wide = useMediaQuery(WIDE_QUERY);
+  // Fiche permanente seulement si l'écran est assez haut (pas sur un téléphone à l'horizontale).
+  const panel = useMediaQuery(PANEL_QUERY);
   const [focus, setFocus] = useState(0);
   const setInspect = (i: Inspect) => {
-    if (i && wide && !i.actions.length) {
+    if (i && panel && !i.actions.length) {
       setFocus(i.code);
       return;
     }
@@ -207,8 +209,9 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   const directHit = view.fx.find((f) => f.kind === "attack" && !f.to);
 
   return (
-    <div className={`duel ${wide ? "duel-wide" : ""}`}>
-      {wide && (
+    <div className={`duel ${wide ? "duel-wide" : ""} ${wide && !panel ? "duel-nopanel" : ""}`}>
+      {use3d && <Board3DLayer onReady={setReady3d} />}
+      {panel && (
         <aside className="card-panel">
           {focus ? <CardDetail code={focus} /> : <p className="muted small">Touchez une carte pour afficher ses informations.</p>}
         </aside>
@@ -227,7 +230,6 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
       </div>
 
       <div className={`duel-board ${use3d && ready3d ? "has-3d" : ""}`}>
-        {use3d && <Board3DLayer onReady={setReady3d} />}
         <Field
           state={state}
           viewer={viewer}
@@ -406,6 +408,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
 }
 
 const WIDE_QUERY = "(orientation: landscape) and (min-aspect-ratio: 4/3) and (min-width: 640px)";
+const PANEL_QUERY = `${WIDE_QUERY} and (min-height: 560px)`;
 
 function useMediaQuery(query: string): boolean {
   const [match, setMatch] = useState(() => window.matchMedia(query).matches);
