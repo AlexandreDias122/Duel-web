@@ -18,7 +18,7 @@ self.addEventListener("fetch", (e) => {
   // (les réponses opaques coûtent très cher en quota sur Safari).
   if (url.origin !== location.origin) return;
   // Scripts Lua et fichiers compilés (nom versionné) : cache d'abord.
-  if (url.pathname.includes("/scripts/") || url.pathname.includes("/assets/")) {
+  if (url.pathname.includes("/scripts/") || url.pathname.includes("/assets/") || url.pathname.includes("/models/")) {
     e.respondWith(cacheFirst(RUNTIME, req));
     return;
   }

@@ -964,3 +964,13 @@ select, input.search, .filters input {
   animation: chat-in 0.25s ease-out;
 }
 @keyframes chat-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+
+/* ===== Plateau 3D (forêt) sous le terrain : le tapis CSS devient transparent ===== */
+.board-3d { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.tool-off { opacity: 0.45; }
+.has-3d .mat { background: none; box-shadow: none; }
+.has-3d .mat::after { display: none; }
+/* Les zones du modèle sont peintes sur le plateau : on ne garde qu'un léger contour des zones CSS. */
+.has-3d .zone::before { opacity: 0.12; }
+.has-3d .zone::after { border-color: transparent; }
+.has-3d .zone-selectable::before, .has-3d .zone-chosen::before { opacity: 0.85; }
