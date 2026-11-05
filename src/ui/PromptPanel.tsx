@@ -16,16 +16,18 @@ interface Props {
   respondingTo?: number;
   /** Carte adverse à garder secrète : affichée de dos, sans nom. */
   hidden?: (c: OcgCardLoc) => boolean;
+  /** Dernier événement du duel, pour situer un effet déclenché. */
+  context?: string;
 }
 
 const HiddenCtx = createContext<(c: OcgCardLoc) => boolean>(() => false);
 
 /** Fenêtre de question pour tout ce qui ne se joue pas directement sur le terrain. */
-export function PromptPanel({ prompt, respond, inspect, playerLabel, respondingTo, hidden: isHidden }: Props) {
+export function PromptPanel({ prompt, respond, inspect, playerLabel, respondingTo, hidden: isHidden, context }: Props) {
   const [hidden, setHidden] = useState(false);
   const db = useDb();
   const m = prompt.message;
-  const body = renderBody(m, respond, inspect, db);
+  const body = renderBody(m, respond, inspect, db, context);
   if (!body) return null;
   const title = prompt.hint || defaultTitle(m);
   if (hidden)
@@ -78,7 +80,7 @@ function defaultTitle(m: OcgMessage): string {
 
 type Db = ReturnType<typeof useDb>;
 
-function renderBody(m: OcgMessage, respond: (r: OcgResponse) => void, inspect: (c: number) => void, db: Db) {
+function renderBody(m: OcgMessage, respond: (r: OcgResponse) => void, inspect: (c: number) => void, db: Db, context?: string) {
   switch (m.type) {
     case T.SELECT_CHAIN:
       return (
@@ -89,7 +91,7 @@ function renderBody(m: OcgMessage, respond: (r: OcgResponse) => void, inspect: (
                 <CardImage code={c.code} />
                 <span>
                   <b>{db.get(c.code)?.name}</b>
-                  <small>{db.desc(c.description) || "Activer l'effet"}</small>
+                  <small>{db.format(c.description, db.get(c.code)?.name ?? "", locationName(c.location)) || "Activer l'effet"}</small>
                 </span>
               </button>
             ))}
@@ -105,7 +107,13 @@ function renderBody(m: OcgMessage, respond: (r: OcgResponse) => void, inspect: (
         <>
           <div className="yn">
             {code > 0 && <CardImage code={code} onClick={() => inspect(code)} />}
-            <p>{code > 0 && <b>{db.get(code)?.name}<br /></b>}{db.desc(m.description) || (code > 0 ? "Utiliser cet effet ?" : "")}</p>
+            <div className="yn-text">
+              <p>{code > 0 && <b>{db.get(code)?.name}<br /></b>}
+                {(m.type === T.SELECT_EFFECTYN ? db.format(m.description, db.get(code)?.name ?? "", locationName(m.location)) : db.desc(m.description)) || (code > 0 ? "Utiliser cet effet ?" : "")}</p>
+              {/* Le moteur ne dit pas quel effet se déclenche : on rappelle ce qui vient de se passer et le texte de la carte. */}
+              {m.type === T.SELECT_EFFECTYN && context && <p className="yn-context">Suite à : {context}</p>}
+              {m.type === T.SELECT_EFFECTYN && db.get(code)?.desc && <div className="yn-effect">{db.get(code)!.desc}</div>}
+            </div>
           </div>
           <div className="sheet-actions">
             <button className="primary" onClick={() => respond(yes(true))}>Oui</button>

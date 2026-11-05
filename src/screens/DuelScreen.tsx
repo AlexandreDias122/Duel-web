@@ -391,7 +391,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
         </div>
       )}
 
-      {msg?.type === T.SELECT_IDLECMD && !menu && !inspect && state.turn <= 4 && (
+      {msg?.type === T.SELECT_IDLECMD && !menu && !pileMenu && !pilePick && !inspect && state.turn <= 4 && (
         <div className="turn-hint">À vous ! Touchez une carte qui brille pour jouer, ou le bouton de phase pour continuer.</div>
       )}
 
@@ -404,13 +404,14 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
           playerLabel={mode === "solo" && promptPlayer !== undefined ? label(promptPlayer) : ""}
           respondingTo={state.chain[state.chain.length - 1]?.code}
           hidden={hiddenCard}
+          context={[...view.log].reverse().find((l) => l.player >= 0 && !l.text.startsWith("—"))?.text}
         />
       )}
 
       {pileMenu && (() => {
         const acts = pileActions(pileMenu.player, pileMenu.location);
         return (
-          <PileMenu anchor={`${pileMenu.player}-${pileMenu.location}`} onClose={() => setPileMenu(null)}
+          <PileMenu onClose={() => setPileMenu(null)}
             buttons={(["special", "activate"] as const).filter((k) => acts[k].length).map((kind) => ({
               kind, label: kind === "special" ? "Invocation Spéciale" : "Activer Effet",
               onClick: () => { setPileMenu(null); setPilePick({ ...pileMenu, kind }); },
@@ -745,30 +746,26 @@ function pileKind(label: string): PileActionKind | null {
   return null;
 }
 
-/** Bouton rond au-dessus d'une pile jouable, comme le « Activer Effet » de Master Duel. */
-function PileMenu({ anchor, buttons, onBrowse, onClose }: {
-  anchor: string; onClose: () => void; onBrowse: () => void;
+/** Menu d'une pile jouable (Cimetière, Extra Deck…), au même endroit et du même style que celui des cartes en main. */
+function PileMenu({ buttons, onBrowse, onClose }: {
+  onClose: () => void; onBrowse: () => void;
   buttons: { kind: PileActionKind; label: string; onClick: () => void }[];
 }) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  useLayoutEffect(() => {
-    const el = document.querySelector(`[data-pile="${anchor}"]`);
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setPos({ x: r.left + r.width / 2, y: r.top });
-  }, [anchor]);
-  if (!pos) return null;
-  const left = Math.max(70, Math.min(window.innerWidth - 70, pos.x));
   return (
-    <div className="menu-backdrop pile-menu-backdrop" onClick={onClose}>
-      <div className="pile-menu" style={{ left, top: Math.max(90, pos.y) }} onClick={(e) => e.stopPropagation()}>
-        {buttons.map((b) => (
-          <button key={b.kind} className={`pile-act pile-act-${b.kind}`} onClick={b.onClick}>
-            <span className="pile-act-icon" />
-            <span className="pile-act-label">{b.label}</span>
+    <div className="menu-backdrop" onClick={onClose}>
+      <div className="action-menu" onClick={(e) => e.stopPropagation()}>
+        <div className="action-buttons">
+          {buttons.map((b) => (
+            <button key={b.kind} className={`action-btn act-${b.kind}`} onClick={b.onClick}>
+              <span className="action-icon">{ACTION_ICONS[b.kind]}</span>
+              <span className="action-label">{b.label}</span>
+            </button>
+          ))}
+          <button className="action-btn act-other" onClick={onBrowse}>
+            <span className="action-icon">☰</span>
+            <span className="action-label">Voir les cartes</span>
           </button>
-        ))}
-        <button className="pile-browse" onClick={onBrowse}>Voir les cartes</button>
+        </div>
       </div>
     </div>
   );
