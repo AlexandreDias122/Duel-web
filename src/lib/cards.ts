@@ -80,6 +80,12 @@ export class CardDb {
     return this.cards.get(code)?.strs[index] ?? "";
   }
 
+  /** Comme desc, avec les « %ls » / « %d » remplacés dans l'ordre par args (nom de carte, lieu…). */
+  format(description: bigint | number, ...args: (string | number)[]): string {
+    let i = 0;
+    return this.desc(description).replace(/%ls|%d/g, () => String(args[i++] ?? ""));
+  }
+
   sys(id: number): string {
     return this.strings.system[id] ?? `#${id}`;
   }

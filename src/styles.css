@@ -1126,24 +1126,6 @@ select, input.search, .filters input {
 @keyframes md-ring-out { 0% { transform: scale(0.8); opacity: 0.9; } 100% { transform: scale(1.15); opacity: 0; } }
 .pile.zone-actionable { z-index: 3; }
 
-/* Bouton rond « Activer Effet » / « Invocation Spéciale » au-dessus de la pile */
-.pile-menu-backdrop { background: rgba(0, 0, 0, 0.18); }
-.pile-menu { position: fixed; translate: -50% -100%; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-bottom: 6px; animation: chat-in 0.18s ease-out; }
-.pile-act { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; padding: 0; color: #fff; cursor: pointer; }
-.pile-act-icon {
-  width: 64px; height: 64px; border-radius: 50%; position: relative;
-  background: radial-gradient(circle at 50% 40%, #26301a, #0b0f07 70%); box-shadow: 0 0 0 3px #b8ec3a, 0 0 0 5px rgba(20, 30, 10, 0.9), 0 0 16px rgba(190, 240, 60, 0.6);
-}
-.pile-act-icon::before {
-  content: ""; position: absolute; inset: 14px; background: #d6f23a;
-  clip-path: polygon(50% 0, 60% 22%, 82% 8%, 76% 34%, 100% 40%, 78% 52%, 70% 52%, 74% 64%, 30% 64%, 30% 52%, 22% 52%, 0 40%, 24% 34%, 18% 8%, 40% 22%);
-}
-.pile-act-icon::after { content: ""; position: absolute; left: 22px; right: 22px; bottom: 13px; height: 10px; border: 3px solid #d6f23a; border-top: none; transform: perspective(30px) rotateX(30deg); }
-.pile-act-special .pile-act-icon::before { clip-path: polygon(10% 0, 30% 0, 34% 40%, 44% 0, 56% 0, 66% 40%, 70% 0, 90% 0, 80% 64%, 20% 64%); }
-.pile-act-label { font-size: 15px; font-weight: 700; text-shadow: 0 1px 3px #000, 0 0 8px #000; white-space: nowrap; }
-.pile-act:active .pile-act-icon { transform: scale(0.94); }
-.pile-browse { font-size: 12px; padding: 4px 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.65); border: 1px solid rgba(255, 255, 255, 0.25); color: #fff; }
-
 /* Fenêtre de choix façon Master Duel */
 .md-dialog-backdrop { display: flex; align-items: center; justify-content: center; }
 .md-dialog {
@@ -1177,3 +1159,7 @@ select, input.search, .filters input {
 .pile-ring:not(.pile-ring-card) { background: radial-gradient(circle, transparent 52%, rgba(255, 230, 90, 0.55) 60%, rgba(255, 210, 60, 0.15) 68%, transparent 71%); }
 /* Consigne de choix de zone : sous la main adverse, pas dessus */
 .duel-wide .duel-board > .banner { top: calc(var(--cw) * 1.15 + 6px); }
+/* Effet déclenché : contexte et texte de la carte, pour savoir de quel effet il s'agit */
+.yn-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.yn-context { font-size: 12px; color: var(--muted); }
+.yn-effect { font-size: 12px; line-height: 1.35; max-height: 96px; overflow-y: auto; padding: 6px 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.3); color: #d8deea; white-space: pre-line; }
