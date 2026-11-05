@@ -29,9 +29,12 @@ const SETTINGS_KEY = "ygo-web.solo-settings";
 const PICK_KEY = "ygo-web.solo-pick";
 
 export function loadSettings(defaultBanlist: string): SoloSettings {
-  const base: SoloSettings = { deckCheck: true, banlist: defaultBanlist, lp: 8000, startHand: 5, drawCount: 1, masterRule: 5, shuffle: true, turnSeconds: 180 };
+  const base: SoloSettings = { deckCheck: true, banlist: defaultBanlist, lp: 8000, startHand: 5, drawCount: 1, masterRule: 5, shuffle: true, turnSeconds: DEFAULT_TURN_SECONDS };
   try {
-    return { ...base, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") };
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}");
+    // Ancien réglage en minutes (menu) : on repart sur 500 s.
+    if (!saved.secondsInput) delete saved.turnSeconds;
+    return { ...base, ...saved };
   } catch {
     return base;
   }
@@ -39,7 +42,7 @@ export function loadSettings(defaultBanlist: string): SoloSettings {
 
 export function saveSettings(s: SoloSettings) {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...s, secondsInput: true }));
   } catch {
     // Navigation privée : réglages non mémorisés.
   }
@@ -70,8 +73,9 @@ export const RULE_LABELS: Record<DuelRules["masterRule"], string> = {
   1: "Master Rules 1",
 };
 
-export const TIMERS = [0, 60, 120, 180, 300, 600];
-export const timerLabel = (s: number) => (s ? `${s / 60} min` : "Aucune");
+/** Temps par tour proposé par défaut, en secondes. */
+export const DEFAULT_TURN_SECONDS = 500;
+export const timerLabel = (s: number) => (s ? `${s} s` : "Aucune");
 
 /** Un deck jouable, par l'IA ou par le joueur. */
 export interface DeckOption {
