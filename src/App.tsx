@@ -168,6 +168,7 @@ function Home({ go, deckCount, account }: { go: (r: Route) => void; deckCount: n
         <InstallHint />
         <footer className="credits">
           Moteur ygopro-core (EDOPro) et données Project Ignis. Images : YGOPRODeck.
+          Modèle 3D « Rescue Rabbit » : Kleen1999 (Sketchfab, CC BY 4.0).
           Projet de fans non officiel, sans lien avec Konami.
         </footer>
       </div>

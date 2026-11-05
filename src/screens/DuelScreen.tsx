@@ -14,6 +14,8 @@ import { PromptPanel } from "../ui/PromptPanel";
 import { cardActions, placeZones } from "../ui/promptLogic";
 import type { CardAction } from "../ui/promptLogic";
 import { useDb } from "../ui/dbContext";
+import { Board3DLayer } from "../ui/Board3DLayer";
+import { board3dEnabled, setBoard3dEnabled } from "../ui/board3dPrefs";
 
 interface Props {
   mode: DuelMode;
@@ -52,6 +54,9 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   const [menu, setMenu] = useState<Menu>(null);
   const [pile, setPile] = useState<PileView>(null);
   const [showLog, setShowLog] = useState(false);
+  // Plateau 3D (forêt + compagnon) : activé par défaut, désactivable pour les appareils modestes.
+  const [use3d, setUse3d] = useState(board3dEnabled);
+  const [ready3d, setReady3d] = useState(false);
   const [chosenZones, setChosenZones] = useState<string[]>([]);
   const { state, prompt } = view;
   const msg = prompt?.message;
@@ -212,6 +217,8 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
         <div className="top-tools">
           <button className="tool" onClick={() => confirm("Abandonner le duel ?") && onExit()} title="Quitter">✕</button>
           <button className="tool" onClick={() => setShowLog(!showLog)} title="Journal">☰</button>
+          <button className={`tool ${use3d ? "" : "tool-off"}`} title={use3d ? "Plateau 3D : activé" : "Plateau 3D : désactivé"}
+            onClick={() => { setBoard3dEnabled(!use3d); setUse3d(!use3d); }}>3D</button>
         </div>
         {handFor(1 - viewer, op.hand, true)}
         <LpPlate name={label(1 - viewer)} lp={op.lp} max={lp} active={!myTurn} side="op" thinking={view.thinking} />
@@ -219,7 +226,8 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
         {view.chat && view.chat.player !== viewer && <div key={view.chat.id} className="bot-chat">{view.chat.text}</div>}
       </div>
 
-      <div className="duel-board">
+      <div className={`duel-board ${use3d && ready3d ? "has-3d" : ""}`}>
+        {use3d && <Board3DLayer onReady={setReady3d} />}
         <Field
           state={state}
           viewer={viewer}
