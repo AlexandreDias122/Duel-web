@@ -82,7 +82,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   const actions = useMemo(() => cardActions(msg, db), [msg, db]);
 
   // La fiche suit la dernière carte jouée, tant que le joueur n'en touche pas une autre.
-  const lastFx = [...view.fx].reverse().find((f) => "code" in f && f.code > 0 && f.kind !== "leave");
+  const lastFx = [...view.fx].reverse().find((f) => "code" in f && f.code > 0 && f.kind !== "leave" && f.kind !== "bury");
   const lastFxCode = lastFx && "code" in lastFx ? lastFx.code : 0;
   useEffect(() => {
     if (lastFxCode) setFocus(lastFxCode);
@@ -283,6 +283,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
               </div>
             );
           if (f.kind === "fly") return <FlyCard key={f.id} fx={f} reveal={!f.faceDown || (f.player === viewer && mode === "ai") || mode === "solo"} />;
+          if (f.kind === "bury") return <BuryCard key={f.id} fx={f} />;
           if (f.kind === "resolve") return <div key={f.id} className="fx-resolve"><span>Résolution</span></div>;
           return null;
         })}
@@ -294,6 +295,9 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
           buttons={phaseButtons}
           onPick={(r) => respond(r)}
         />
+        {view.clock !== null && prompt && (
+          <div className={`clock ${view.clock <= 30 ? "low" : ""}`}><span>⏱ </span>{Math.floor(view.clock / 60)}:{String(view.clock % 60).padStart(2, "0")}</div>
+        )}
         {(msg?.type === T.SELECT_PLACE || msg?.type === T.SELECT_DISFIELD) && (
           <div className="banner">{prompt?.hint || "Choisissez une zone"} ({chosenZones.length}/{msg.count})</div>
         )}
@@ -305,9 +309,6 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
         <DamagePops fx={view.fx} player={viewer} />
       </div>
 
-      {view.clock !== null && prompt && (
-        <div className={`clock ${view.clock <= 30 ? "low" : ""}`}>⏱ {Math.floor(view.clock / 60)}:{String(view.clock % 60).padStart(2, "0")}</div>
-      )}
 
       {menu && actions.get(menu.key) && (
         <div className="menu-backdrop" onClick={() => setMenu(null)}>
@@ -533,6 +534,61 @@ function FlyCard({ fx, reveal }: { fx: Extract<Fx, { kind: "fly" }>; reveal: boo
     <div ref={ref} className="fly-card">
       <CardImage code={fx.code} back={!reveal || !fx.code} />
     </div>
+  );
+}
+
+/**
+ * Carte envoyée au cimetière ou bannie : elle se fissure sur sa zone (si elle vient du terrain),
+ * glisse jusqu'à son socle et s'y engouffre, comme dans Master Duel. Le socle ne garde pas la carte.
+ */
+function BuryCard({ fx }: { fx: Extract<Fx, { kind: "bury" }> }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const glow = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current, halo = glow.current;
+    const target = document.querySelector(`[data-pile="${fx.to}"]`);
+    const source = fx.fromKey
+      ? document.querySelector(`[data-zone="${fx.fromKey}"]`)
+      : fx.from & LOC.HAND
+        ? document.querySelector(`[data-hand="${fx.player}"]`)
+        : document.querySelector(`[data-pile="${fx.player}-${fx.from & LOC.EXTRA ? LOC.EXTRA : LOC.DECK}"]`);
+    if (!el || !halo || !target || !source) return;
+    const box = el.parentElement!.getBoundingClientRect();
+    const tr = target.getBoundingClientRect();
+    const sr = source.getBoundingClientRect();
+    const tx = tr.left - box.left + tr.width / 2, ty = tr.top - box.top + tr.height / 2;
+    const sx = sr.left - box.left + sr.width / 2, sy = sr.top - box.top + sr.height / 2;
+    const w = tr.width * 0.84;
+    const from = fx.fromKey ? (sr.width * 0.86) / w : fx.from & LOC.HAND ? 1.5 : 1;
+    el.style.width = `${w}px`;
+    el.style.left = `${tx - w / 2}px`;
+    el.style.top = `${ty - (w * 1.46) / 2}px`;
+    const dx = sx - tx, dy = sy - ty;
+    const hold = fx.fromKey ? 0.3 : 0.05;
+    el.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(${from})`, opacity: 1, filter: "brightness(1)" },
+        { transform: `translate(${dx}px, ${dy}px) scale(${from * 1.04})`, opacity: 1, filter: "brightness(1.5)", offset: hold },
+        { transform: `translate(${dx * 0.4}px, ${dy * 0.4 - 26}px) scale(${(from + 1) / 2}) rotate(${dx > 0 ? -8 : 8}deg)`, opacity: 1, filter: "brightness(1.2)", offset: hold + 0.3 },
+        { transform: "translate(0, 0) scale(0.9)", opacity: 1, filter: "brightness(1.4)", offset: 0.82 },
+        { transform: "translate(0, 6px) scale(0.35)", opacity: 0, filter: "brightness(3)" },
+      ],
+      { duration: fx.fromKey ? 1050 : 800, easing: "cubic-bezier(0.4, 0, 0.3, 1)", fill: "forwards" },
+    );
+    halo.style.left = `${tx}px`;
+    halo.style.top = `${ty}px`;
+    halo.animate(
+      [{ opacity: 0, transform: "translate(-50%, -50%) scale(0.4)" }, { opacity: 1, transform: "translate(-50%, -50%) scale(1)", offset: 0.4 }, { opacity: 0, transform: "translate(-50%, -50%) scale(1.5)" }],
+      { duration: 520, delay: fx.fromKey ? 780 : 560, easing: "ease-out", fill: "both" },
+    );
+  }, [fx]);
+  return (
+    <>
+      <div ref={ref} className={`fly-card bury-card ${fx.fromKey ? "from-field" : ""}`}>
+        <CardImage code={fx.code} back={!fx.code} />
+      </div>
+      <div ref={glow} className={`bury-glow ${fx.banish ? "banish" : ""}`} />
+    </>
   );
 }
 

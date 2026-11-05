@@ -990,7 +990,7 @@ select, input.search, .filters input {
 .zone { width: calc(var(--u) * 7.8); height: calc(var(--u) * 7.8); flex: none; }
 .pile { flex: none; }
 /* Bouton de phase à droite, entre les deux camps, comme sur le plateau d'origine */
-.duel-board .phase-wrap, .duel-board .phase-wrap:not(#_) { left: calc(50% + var(--u) * 24); right: auto; top: 50%; translate: -50% -50%; }
+.duel-board .phase-wrap, .duel-board .phase-wrap:not(#_) { left: calc(50% + var(--u) * 26.31); right: auto; top: 50%; translate: -50% -50%; }
 .card-back { background: #2e1406 url("./assets/card-back.webp") center / cover no-repeat; border: none; box-shadow: none; }
 
 /* Avec le plateau 3D : les zones sont peintes sur le modèle, seules les cases à choisir s'allument. */
@@ -1003,3 +1003,62 @@ select, input.search, .filters input {
 .has-3d .socket { display: none; }
 /* Téléphone à l'horizontale : pas de fiche permanente, le terrain prend toute la largeur. */
 .duel-nopanel { --panel-w: 0px; }
+
+/* ===== Animations façon Master Duel (textures d'effets du jeu d'origine, utilisées comme masques) ===== */
+.fx-tex { position: absolute; inset: 0; pointer-events: none; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; }
+/* Invocation : anneau doré qui s'ouvre et éclat en étoile */
+.fx-summon-layer, .fx-spsummon-layer, .fx-flip-layer { background: none; animation: none; inset: -70%; }
+.fx-summon-layer::before, .fx-summon-layer::after, .fx-spsummon-layer::before, .fx-spsummon-layer::after, .fx-flip-layer::before {
+  content: ""; position: absolute; inset: 0; border: none; border-radius: 0; box-shadow: none;
+  -webkit-mask: var(--tex) center / contain no-repeat; mask: var(--tex) center / contain no-repeat;
+}
+.fx-summon-layer::before { --tex: url("./assets/fx/ring.webp"); background: radial-gradient(circle, #fff 30%, #ffd772 60%, #ff9d2e); animation: md-ring 0.75s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+.fx-summon-layer::after { --tex: url("./assets/fx/flare.webp"); background: #fff6d8; animation: md-flare 0.6s ease-out forwards; }
+/* Invocation Spéciale : onde de choc bleutée et demi-anneau qui tourne */
+.fx-spsummon-layer::before { --tex: url("./assets/fx/shockring.webp"); background: radial-gradient(circle, #fff 20%, #8ff3ff 55%, #2bb7e8); animation: md-ring 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+.fx-spsummon-layer::after { --tex: url("./assets/fx/halfring.webp"); background: #c9f8ff; inset: 15%; animation: md-spin 0.9s ease-out forwards; }
+.fx-flip-layer::before { --tex: url("./assets/fx/flare.webp"); background: #fff; animation: md-flare 0.6s ease-out forwards; }
+@keyframes md-ring { 0% { transform: scale(0.15); opacity: 0; } 15% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+@keyframes md-flare { 0% { transform: scale(0.2) rotate(0); opacity: 0; } 25% { transform: scale(0.9) rotate(20deg); opacity: 1; } 100% { transform: scale(1.2) rotate(45deg); opacity: 0; } }
+@keyframes md-spin { 0% { transform: rotate(0) scale(0.5); opacity: 0; } 20% { opacity: 1; } 100% { transform: rotate(240deg) scale(1.1); opacity: 0; } }
+/* Carte qui quitte le terrain : elle se fissure sur place (puis la carte volante l'emmène au socle) */
+.fx-leave-layer { inset: -10%; }
+.fx-leave-layer .card-img { display: none; }
+.fx-leave-layer::before {
+  content: ""; position: absolute; inset: 0; background: #fff;
+  -webkit-mask: url("./assets/fx/crack.webp") center / contain no-repeat; mask: url("./assets/fx/crack.webp") center / contain no-repeat;
+  animation: md-crack 0.35s ease-out forwards;
+}
+@keyframes md-crack { 0% { opacity: 0; transform: scale(0.6); } 40% { opacity: 1; } 100% { opacity: 0; transform: scale(1.15); } }
+.bury-card { z-index: 31; }
+.bury-card.from-field .card-img { box-shadow: 0 0 14px rgba(255, 255, 255, 0.7); }
+/* Lueur qui monte du socle quand la carte s'y engouffre (bleue au cimetière, violette au bannissement) */
+.bury-glow {
+  position: absolute; z-index: 30; pointer-events: none; width: calc(var(--u, 8px) * 9); aspect-ratio: 1; opacity: 0;
+  background: radial-gradient(circle, #fff 10%, #7fd0ff 40%, #1d6bff);
+  -webkit-mask: url("./assets/fx/glow.webp") center / contain no-repeat; mask: url("./assets/fx/glow.webp") center / contain no-repeat;
+}
+.bury-glow.banish { background: radial-gradient(circle, #fff 10%, #d6a0ff 40%, #7a2fe0); }
+
+/* Deck et Extra Deck légèrement tournés pour suivre les angles du plateau */
+.pile-deck .pile-stack { rotate: -20deg; }
+.pile-extra .pile-stack { rotate: 20deg; }
+
+/* Bouton de phase et minuteur : anneaux dorés du plateau 3D, le texte se pose dessus */
+.has-3d .phase-orb {
+  width: calc(var(--u) * 6.2); height: calc(var(--u) * 6.2); min-width: 44px; min-height: 44px; clip-path: none; border-radius: 50%;
+  background: none !important; filter: none;
+}
+.has-3d .phase-orb::before { display: none; }
+.has-3d .phase-orb.ready { box-shadow: 0 0 0 2px rgba(255, 220, 120, 0.85), 0 0 18px 4px rgba(255, 200, 80, 0.7); filter: none; }
+.has-3d .phase-orb.ready::after { border-radius: 50%; }
+.has-3d .phase-orb b { font-size: clamp(10px, calc(var(--u) * 1.5), 16px); }
+.has-3d .phase-orb small { font-size: clamp(7px, calc(var(--u) * 0.9), 10px); }
+.duel-board .clock { bottom: auto; right: auto; left: calc(50% - var(--u) * 25.65); top: 50%; translate: -50% -50%; }
+.has-3d .clock {
+  width: calc(var(--u) * 5); height: calc(var(--u) * 5); min-width: 40px; min-height: 40px; padding: 0;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; background: none;
+  font-family: var(--font-atk); font-size: clamp(10px, calc(var(--u) * 1.3), 15px); text-shadow: 0 0 6px #4fc3ff, 0 1px 0 #000;
+}
+.has-3d .clock span { display: none; }
+.has-3d .clock.low { text-shadow: 0 0 6px #ff4d6d, 0 1px 0 #000; }

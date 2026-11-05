@@ -31,7 +31,8 @@ export async function createBoard3D(canvas: HTMLCanvasElement, board: HTMLElemen
   camera.matrixAutoUpdate = false;
 
   const loader = new GLTFLoader();
-  const files = ["forest_near.glb", "forest_far.glb", ...PEDESTALS.map(([f]) => f)];
+  // Minuteur et bouton de phase : déjà placés dans leur modèle (bord gauche et bord droit, entre les deux camps).
+  const files = ["forest_near.glb", "forest_far.glb", ...PEDESTALS.map(([f]) => f), "timer.glb", "phase_button.glb"];
   const gltfs = await Promise.all(files.map((f) => loader.loadAsync(MODELS + f)));
 
   // Le plateau d'origine n'est pas éclairé (shaders « Unlit ») : matériaux de base.
@@ -42,8 +43,10 @@ export async function createBoard3D(canvas: HTMLCanvasElement, board: HTMLElemen
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       const src = mesh.material as THREE.MeshStandardMaterial;
+      // Les cadrans (shader animé à l'origine, sans texture) deviennent un verre bleu nuit sous le texte.
+      const glass = i >= 2 + PEDESTALS.length && (!src.map || /surface/i.test(mesh.name));
       mesh.material = new THREE.MeshBasicMaterial({
-        map: src.map, color: src.color, side: THREE.DoubleSide,
+        map: src.map, color: glass ? new THREE.Color(0x0b1b3a) : src.color, side: THREE.DoubleSide,
         transparent: src.transparent, alphaTest: src.alphaTest, depthWrite: !src.transparent,
       });
       src.dispose();

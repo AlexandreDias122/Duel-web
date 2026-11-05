@@ -24,13 +24,15 @@ export type Fx = { id: number } & (
   | { kind: "attack"; from: string; to: string | null; player: number }
   | { kind: "damage"; player: number; amount: number; heal: boolean }
   | { kind: "leave"; code: number; key: string }
+  /** Carte envoyée au cimetière ou bannie : elle rejoint son socle et s'y efface. */
+  | { kind: "bury"; code: number; player: number; from: number; seq: number; fromKey: string | null; to: string; banish: boolean; faceDown: boolean }
   /** Carte qui glisse d'une pile (main, deck, Extra Deck…) jusqu'à sa zone. */
   | { kind: "fly"; code: number; player: number; from: number; seq: number; to: string; faceDown: boolean }
 );
 type FxInput = Fx extends infer F ? (F extends Fx ? Omit<F, "id"> : never) : never;
 
 const FX_LIFETIME: Record<Fx["kind"], number> = {
-  activate: 1100, summon: 900, spsummon: 1100, flip: 800, set: 600, banner: 1200, chain: 1300, resolve: 900, attack: 900, damage: 1300, leave: 700, fly: 700,
+  activate: 1100, summon: 900, spsummon: 1100, flip: 800, set: 600, banner: 1200, chain: 1300, resolve: 900, attack: 900, damage: 1300, leave: 700, fly: 700, bury: 1200,
 };
 
 export interface DuelView {
@@ -249,8 +251,16 @@ export class DuelController {
             kind: "fly", code: msg.card, player: msg.from.controller, from: msg.from.location, seq: msg.from.sequence,
             to: cardKey(msg.to.controller, msg.to.location, msg.to.sequence), faceDown: (msg.to.position & POS.FACEDOWN) !== 0,
           }];
-        if (msg.from.location & (LOC.MZONE | LOC.SZONE) && msg.to.location & (LOC.GRAVE | LOC.REMOVED) && msg.card)
-          return [{ kind: "leave", code: msg.card, key: cardKey(msg.from.controller, msg.from.location, msg.from.sequence) }];
+        if (msg.to.location & (LOC.GRAVE | LOC.REMOVED) && msg.from.location & (LOC.MZONE | LOC.SZONE | LOC.HAND | LOC.DECK | LOC.EXTRA)) {
+          const field = msg.from.location & (LOC.MZONE | LOC.SZONE);
+          const fromKey = field ? cardKey(msg.from.controller, field, msg.from.sequence) : null;
+          const banish = (msg.to.location & LOC.REMOVED) !== 0;
+          const bury: FxInput = {
+            kind: "bury", code: msg.card, player: msg.from.controller, from: msg.from.location, seq: msg.from.sequence, fromKey,
+            to: `${msg.to.controller}-${banish ? LOC.REMOVED : LOC.GRAVE}`, banish, faceDown: (msg.to.position & POS.FACEDOWN) !== 0,
+          };
+          return fromKey && msg.card ? [{ kind: "leave", code: msg.card, key: fromKey }, bury] : [bury];
+        }
         return [];
       default: return [];
     }
@@ -315,7 +325,10 @@ function pauseFor(msg: OcgMessage, state: DuelState): number {
     case T.ATTACK: return 750;
     case T.BATTLE: return 350;
     case T.DAMAGE: case T.RECOVER: case T.PAY_LPCOST: return 650;
-    case T.MOVE: return isArrival(msg) ? 520 : msg.from.location & (LOC.MZONE | LOC.SZONE) && msg.to.location & (LOC.GRAVE | LOC.REMOVED) ? 450 : 200;
+    case T.MOVE:
+      if (isArrival(msg)) return 520;
+      if (msg.to.location & (LOC.GRAVE | LOC.REMOVED)) return msg.from.location & (LOC.MZONE | LOC.SZONE) ? 600 : 380;
+      return 200;
     case T.SET: return 400;
     case T.POS_CHANGE: return 300;
     case T.DRAW: return 300;
