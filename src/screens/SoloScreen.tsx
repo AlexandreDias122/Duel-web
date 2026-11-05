@@ -5,7 +5,7 @@ import type { Deck } from "../lib/deck";
 import { useBanlists, useDb } from "../ui/dbContext";
 import type { StarterDeck } from "./DecksScreen";
 import type { DeckOption, SoloSettings } from "./solo/options";
-import { buildOptions, loadPick, loadSettings, loadWindBotDecks, RULE_LABELS, savePick, saveSettings, TIMERS, timerLabel } from "./solo/options";
+import { buildOptions, loadPick, loadSettings, loadWindBotDecks, RULE_LABELS, savePick, saveSettings } from "./solo/options";
 import { Art, MdHeader, MdTab, Triangles } from "./solo/ui";
 import "./solo/solo.css";
 
@@ -118,12 +118,7 @@ export function SoloScreen({ decks, starters, onBack, onStart }: Props) {
             Mélange<i>{settings.shuffle ? "ON" : "OFF"}</i>
           </button>
           <div className="md-fields">
-            <label className="md-field md-select">
-              <span>Temps par tour :</span>
-              <select value={settings.turnSeconds} onChange={(e) => set({ turnSeconds: Number(e.target.value) })}>
-                {TIMERS.map((t) => <option key={t} value={t}>{timerLabel(t)}</option>)}
-              </select>
-            </label>
+            <NumberField label="Temps par tour (s) :" value={settings.turnSeconds} min={0} max={3600} onChange={(turnSeconds) => set({ turnSeconds })} />
             <NumberField label="Points de vie :" value={settings.lp} min={100} max={99999} onChange={(lp) => set({ lp })} />
             <NumberField label="Main de départ :" value={settings.startHand} min={1} max={20} onChange={(startHand) => set({ startHand })} />
             <NumberField label="Cartes par pioche :" value={settings.drawCount} min={1} max={10} onChange={(drawCount) => set({ drawCount })} />
