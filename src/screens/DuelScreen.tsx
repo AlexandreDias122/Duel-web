@@ -5,7 +5,7 @@ import { DuelController } from "../engine/controller";
 import type { Fx } from "../engine/controller";
 import type { DuelMode } from "../engine/controller";
 import type { DeckList, DuelRules, FieldCard } from "../engine/protocol";
-import { LOC, PHASE } from "../lib/constants";
+import { LOC, PHASE, POS } from "../lib/constants";
 import { CardDetail } from "../ui/CardDetail";
 import { CardImage } from "../ui/CardImage";
 import { Field } from "../ui/Field";
@@ -34,6 +34,8 @@ type Inspect = { code: number; actions: CardAction[] } | null;
 /** Menu d'actions rapide façon Master Duel, ouvert en touchant une carte jouable. */
 type Menu = { key: string; code: number; actions: CardAction[] } | null;
 type PileView = { player: number; location: number } | null;
+type PilePick = { player: number; location: number; kind: PileActionKind } | null;
+type PileActionKind = "special" | "activate";
 
 export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, rules, onExit, onRematch }: Props) {
   const db = useDb();
@@ -60,6 +62,10 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   const [use3d, setUse3d] = useState(board3dEnabled);
   const [ready3d, setReady3d] = useState(false);
   const [chosenZones, setChosenZones] = useState<string[]>([]);
+  /** Boutons « Activer Effet » / « Invocation Spéciale » au-dessus d'une pile (Cimetière, Extra Deck…) qui a des cartes jouables. */
+  const [pileMenu, setPileMenu] = useState<PileView>(null);
+  /** Choix de la carte à jouer depuis une pile, façon Master Duel. */
+  const [pilePick, setPilePick] = useState<PilePick>(null);
   const { state, prompt } = view;
   const msg = prompt?.message;
 
@@ -67,6 +73,8 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
     setInspect(null);
     setMenu(null);
     setPile(null);
+    setPileMenu(null);
+    setPilePick(null);
     setChosenZones([]);
     controller.respond(r);
   };
@@ -82,7 +90,8 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   const actions = useMemo(() => cardActions(msg, db), [msg, db]);
 
   // La fiche suit la dernière carte jouée, tant que le joueur n'en touche pas une autre.
-  const lastFx = [...view.fx].reverse().find((f) => "code" in f && f.code > 0 && f.kind !== "leave" && f.kind !== "bury");
+  const lastFx = [...view.fx].reverse().find((f) => "code" in f && f.code > 0 && f.kind !== "leave" && f.kind !== "bury" && f.kind !== "travel"
+    && !(mode === "ai" && f.kind === "set" && f.player !== human) && !(mode === "ai" && f.kind === "fly" && f.faceDown && f.player !== human));
   const lastFxCode = lastFx && "code" in lastFx ? lastFx.code : 0;
   useEffect(() => {
     if (lastFxCode) setFocus(lastFxCode);
@@ -125,9 +134,29 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   const op = state.players[1 - viewer];
   const label = (p: number) => (mode === "ai" ? (p === human ? names[0] : names[1]) : names[p]);
 
+  /** Carte de l'adversaire qu'on ne doit pas voir : face cachée sur le terrain (sauf déjà révélée), en main, ou bannie face cachée. */
+  const hiddenCard = (c: { controller: number; location: number; sequence: number }) => {
+    if (mode !== "ai" || c.controller === viewer) return false;
+    const pl = state.players[c.controller];
+    const loc = c.location & ~LOC.OVERLAY;
+    if (loc & (LOC.MZONE | LOC.SZONE)) {
+      const zone = loc & LOC.MZONE ? LOC.MZONE : LOC.SZONE;
+      const card = (zone === LOC.MZONE ? pl.mzone : pl.szone)[c.sequence];
+      return !!card && (card.position & POS.FACEDOWN) !== 0 && !view.known.has(cardKey(c.controller, zone, c.sequence));
+    }
+    if (loc & LOC.HAND) return !pl.hand[c.sequence]?.isPublic;
+    if (loc & LOC.DECK) return true;
+    if (loc & (LOC.REMOVED | LOC.EXTRA)) {
+      const card = (loc & LOC.REMOVED ? pl.removed : pl.extra)[c.sequence];
+      return !card || !(card.position & POS.FACEUP);
+    }
+    return false;
+  };
+
   const onCard = (controller: number, location: number, sequence: number, card: FieldCard) => {
     const key = cardKey(controller, location, sequence);
     const list = actions.get(key) ?? [];
+    if (!list.length && hiddenCard({ controller, location, sequence })) return setMenu(null);
     if (list.length) {
       setMenu(menu?.key === key ? null : { key, code: card.code, actions: list });
       if (card.code) setFocus(card.code);
@@ -160,6 +189,8 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
     if (msg.to_ep) phaseButtons.push({ label: "Fin du tour", response: { type: R.SELECT_BATTLECMD, action: 3, index: null } });
   }
 
+  // Cartes en route vers la main : on cache la vraie carte le temps que la carte volante arrive.
+  const arriving = new Set(view.fx.flatMap((f) => (f.kind === "travel" && f.to.startsWith("hand:") ? [f.to.slice(5)] : [])));
   const handFor = (player: number, cards: FieldCard[], top: boolean) => {
     const visible = !top || mode === "solo";
     return (
@@ -168,7 +199,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
           const key = cardKey(player, LOC.HAND, i);
           const act = actions.has(key);
           return (
-            <div key={i} className={`hand-card ${act ? "zone-actionable" : ""} ${targets.has(key) ? "zone-target" : ""} ${menu?.key === key ? "menu-open" : ""}`}
+            <div key={i} className={`hand-card ${arriving.has(`${player}-${i}`) ? "hand-arriving" : ""} ${act ? "zone-actionable" : ""} ${targets.has(key) ? "zone-target" : ""} ${menu?.key === key ? "menu-open" : ""}`}
               onClick={() => visible || c.isPublic ? onCard(player, LOC.HAND, i, c) : undefined}>
               <CardImage code={c.code} back={!visible && !c.isPublic} />
             </div>
@@ -184,7 +215,29 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
       : pile.location === LOC.EXTRA ? state.players[pile.player].extra : [])
     : [];
   const pileHidden = (c: FieldCard) =>
-    pile?.location === LOC.EXTRA && pile.player !== viewer && mode === "ai" && !(c.position & 0x5);
+    !!pile && (pile.location === LOC.EXTRA || pile.location === LOC.REMOVED) && pile.player !== viewer && mode === "ai" && !(c.position & POS.FACEUP);
+
+  // Actions jouables depuis une pile, regroupées comme dans Master Duel : « Invocation Spéciale » ou « Activer Effet ».
+  const pileActions = (player: number, location: number) => {
+    const list = location === LOC.GRAVE ? state.players[player].grave : location === LOC.REMOVED ? state.players[player].removed
+      : location === LOC.EXTRA ? state.players[player].extra : [];
+    const out: Record<PileActionKind, { index: number; card: FieldCard; actions: CardAction[] }[]> = { special: [], activate: [] };
+    list.forEach((card, index) => {
+      for (const kind of ["special", "activate"] as const) {
+        const acts = (actions.get(cardKey(player, location, index)) ?? []).filter((a) => pileKind(a.label) === kind);
+        if (acts.length) out[kind].push({ index, card, actions: acts });
+      }
+    });
+    return out;
+  };
+  const onPile = (player: number, location: number) => {
+    if (location === LOC.DECK) return;
+    const acts = pileActions(player, location);
+    if (acts.special.length || acts.activate.length) {
+      setMenu(null);
+      setPileMenu(pileMenu?.player === player && pileMenu.location === location ? null : { player, location });
+    } else setPile({ player, location });
+  };
 
   const waitingAi = !prompt && !view.end;
   const myTurn = state.turnPlayer === viewer;
@@ -238,9 +291,10 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
           chosenZones={new Set(chosenZones)}
           targets={targets}
           revealAll={mode === "solo"}
+          hidden={hiddenCard}
           onCard={onCard}
           onZone={onZone}
-          onPile={(player, location) => location !== LOC.DECK && setPile({ player, location })}
+          onPile={onPile}
           zoneFx={zoneFx}
           chainAt={chainAt}
         />
@@ -283,7 +337,13 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
               </div>
             );
           if (f.kind === "fly") return <FlyCard key={f.id} fx={f} reveal={!f.faceDown || (f.player === viewer && mode === "ai") || mode === "solo"} />;
-          if (f.kind === "bury") return <BuryCard key={f.id} fx={f} />;
+          if (f.kind === "bury") return <BuryCard key={f.id} fx={f} hidden={f.faceDown && mode === "ai" && f.player !== viewer} />;
+          if (f.kind === "travel") {
+            // On ne montre pas la carte piochée ou ajoutée depuis le Deck par l'adversaire, ni une carte qui part face cachée chez lui.
+            const secret = mode === "ai" && f.owner !== viewer && (f.faceDown || (f.toLoc & LOC.HAND && f.fromLoc & LOC.DECK));
+            const mine = f.owner === viewer || mode === "solo";
+            return <TravelCard key={f.id} fx={f} reveal={!!f.code && !secret && (mine || !f.faceDown)} />;
+          }
           if (f.kind === "resolve") return <div key={f.id} className="fx-resolve"><span>Résolution</span></div>;
           return null;
         })}
@@ -343,6 +403,33 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
           inspect={(code) => setInspect({ code, actions: [] })}
           playerLabel={mode === "solo" && promptPlayer !== undefined ? label(promptPlayer) : ""}
           respondingTo={state.chain[state.chain.length - 1]?.code}
+          hidden={hiddenCard}
+        />
+      )}
+
+      {pileMenu && (() => {
+        const acts = pileActions(pileMenu.player, pileMenu.location);
+        return (
+          <PileMenu anchor={`${pileMenu.player}-${pileMenu.location}`} onClose={() => setPileMenu(null)}
+            buttons={(["special", "activate"] as const).filter((k) => acts[k].length).map((kind) => ({
+              kind, label: kind === "special" ? "Invocation Spéciale" : "Activer Effet",
+              onClick: () => { setPileMenu(null); setPilePick({ ...pileMenu, kind }); },
+            }))}
+            onBrowse={() => { setPile(pileMenu); setPileMenu(null); }} />
+        );
+      })()}
+
+      {pilePick && (
+        <PilePickDialog
+          title={pilePick.kind === "special" ? "Sélectionnez le Monstre à Invoquer Spécialement." : "Sélectionnez un effet à activer."}
+          choices={pileActions(pilePick.player, pilePick.location)[pilePick.kind]}
+          onInspect={(code) => setInspect({ code, actions: [] })}
+          onCancel={() => setPilePick(null)}
+          onChoose={(c) => {
+            setPilePick(null);
+            if (c.actions.length === 1) respond(c.actions[0].response);
+            else setMenu({ key: cardKey(pilePick.player, pilePick.location, c.index), code: c.card.code, actions: c.actions });
+          }}
         />
       )}
 
@@ -541,7 +628,7 @@ function FlyCard({ fx, reveal }: { fx: Extract<Fx, { kind: "fly" }>; reveal: boo
  * Carte envoyée au cimetière ou bannie : elle se fissure sur sa zone (si elle vient du terrain),
  * glisse jusqu'à son socle et s'y engouffre, comme dans Master Duel. Le socle ne garde pas la carte.
  */
-function BuryCard({ fx }: { fx: Extract<Fx, { kind: "bury" }> }) {
+function BuryCard({ fx, hidden }: { fx: Extract<Fx, { kind: "bury" }>; hidden: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const glow = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -585,10 +672,132 @@ function BuryCard({ fx }: { fx: Extract<Fx, { kind: "bury" }> }) {
   return (
     <>
       <div ref={ref} className={`fly-card bury-card ${fx.fromKey ? "from-field" : ""}`}>
-        <CardImage code={fx.code} back={!fx.code} />
+        <CardImage code={fx.code} back={!fx.code || hidden} />
       </div>
       <div ref={glow} className={`bury-glow ${fx.banish ? "banish" : ""}`} />
     </>
+  );
+}
+
+/** Élément visé par une extrémité d'un déplacement (« zone:… », « pile:… », « hand:joueur-index »). */
+function endpointRect(ep: string): { rect: DOMRect; hand: boolean } | null {
+  const [kind, id] = [ep.slice(0, ep.indexOf(":")), ep.slice(ep.indexOf(":") + 1)];
+  if (kind === "zone") {
+    const el = document.querySelector(`[data-zone="${id}"]`);
+    return el ? { rect: el.getBoundingClientRect(), hand: false } : null;
+  }
+  if (kind === "pile") {
+    const el = document.querySelector(`[data-pile="${id}"]`);
+    return el ? { rect: el.getBoundingClientRect(), hand: false } : null;
+  }
+  const [player, index] = id.split("-").map(Number);
+  const hand = document.querySelector(`[data-hand="${player}"]`);
+  if (!hand) return null;
+  const card = hand.children[Math.min(index, hand.children.length - 1)];
+  return { rect: (card ?? hand).getBoundingClientRect(), hand: true };
+}
+
+/**
+ * Tout déplacement qui n'est ni une arrivée sur le terrain ni un envoi au Cimetière : pioche, ajout à la main,
+ * retour au Deck, Cimetière → bannis… La carte suit un arc de sa position de départ à son arrivée.
+ */
+function TravelCard({ fx, reveal }: { fx: Extract<Fx, { kind: "travel" }>; reveal: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const from = endpointRect(fx.from), to = endpointRect(fx.to);
+    if (!el || !from || !to) return;
+    const box = el.parentElement!.getBoundingClientRect();
+    const tr = to.rect, sr = from.rect;
+    // Taille d'arrivée : celle de la carte en main, sinon une carte du terrain.
+    const w = to.hand ? tr.width : Math.min(tr.width * 0.84, tr.height / 1.46);
+    const sw = from.hand ? sr.width : Math.min(sr.width * 0.84, sr.height / 1.46);
+    const tx = tr.left - box.left + tr.width / 2, ty = tr.top - box.top + tr.height / 2;
+    const sx = sr.left - box.left + sr.width / 2, sy = sr.top - box.top + sr.height / 2;
+    el.style.width = `${w}px`;
+    el.style.left = `${tx - w / 2}px`;
+    el.style.top = `${ty - (w * 1.46) / 2}px`;
+    const dx = sx - tx, dy = sy - ty, s0 = sw / w;
+    // La pioche part du Deck incliné et se redresse en montant dans la main.
+    const tilt = fx.fromLoc & LOC.DECK ? (dx > 0 ? -20 : 20) : 0;
+    const toPile = fx.to.startsWith("pile:");
+    el.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(${s0}) rotate(${tilt}deg)`, opacity: 0 },
+        { transform: `translate(${dx}px, ${dy - 8}px) scale(${s0 * 1.05}) rotate(${tilt}deg)`, opacity: 1, offset: 0.12 },
+        { transform: `translate(${dx * 0.45}px, ${dy * 0.45 - 40}px) scale(${(s0 + 1) / 2 + 0.12}) rotate(${tilt / 2}deg)`, opacity: 1, offset: 0.55 },
+        { transform: "translate(0, 0) scale(1) rotate(0)", opacity: 1, offset: toPile ? 0.85 : 1 },
+        ...(toPile ? [{ transform: "translate(0, 0) scale(0.6)", opacity: 0 }] : []),
+      ],
+      { duration: 560, delay: fx.delay, easing: "cubic-bezier(0.3, 0.7, 0.3, 1)", fill: "both" },
+    );
+  }, [fx]);
+  return (
+    <div ref={ref} className="fly-card travel-card">
+      <CardImage code={fx.code} back={!reveal} />
+    </div>
+  );
+}
+
+function pileKind(label: string): PileActionKind | null {
+  if (label.startsWith("Invocation Spéciale")) return "special";
+  if (label.startsWith("Activer")) return "activate";
+  return null;
+}
+
+/** Bouton rond au-dessus d'une pile jouable, comme le « Activer Effet » de Master Duel. */
+function PileMenu({ anchor, buttons, onBrowse, onClose }: {
+  anchor: string; onClose: () => void; onBrowse: () => void;
+  buttons: { kind: PileActionKind; label: string; onClick: () => void }[];
+}) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = document.querySelector(`[data-pile="${anchor}"]`);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({ x: r.left + r.width / 2, y: r.top });
+  }, [anchor]);
+  if (!pos) return null;
+  const left = Math.max(70, Math.min(window.innerWidth - 70, pos.x));
+  return (
+    <div className="menu-backdrop pile-menu-backdrop" onClick={onClose}>
+      <div className="pile-menu" style={{ left, top: Math.max(90, pos.y) }} onClick={(e) => e.stopPropagation()}>
+        {buttons.map((b) => (
+          <button key={b.kind} className={`pile-act pile-act-${b.kind}`} onClick={b.onClick}>
+            <span className="pile-act-icon" />
+            <span className="pile-act-label">{b.label}</span>
+          </button>
+        ))}
+        <button className="pile-browse" onClick={onBrowse}>Voir les cartes</button>
+      </div>
+    </div>
+  );
+}
+
+/** Fenêtre « Sélectionnez… » de Master Duel : les cartes jouables de la pile, puis Annuler / Choisir. */
+function PilePickDialog({ title, choices, onChoose, onCancel, onInspect }: {
+  title: string; choices: { index: number; card: FieldCard; actions: CardAction[] }[];
+  onChoose: (c: { index: number; card: FieldCard; actions: CardAction[] }) => void; onCancel: () => void; onInspect: (code: number) => void;
+}) {
+  const [sel, setSel] = useState(choices.length === 1 ? 0 : -1);
+  return (
+    <div className="sheet-backdrop md-dialog-backdrop" onClick={onCancel}>
+      <div className="md-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="md-dialog-title">{title}</div>
+        <div className="md-dialog-cards">
+          {choices.map((c, i) => (
+            <button key={c.index} className={`md-dialog-card ${sel === i ? "on" : ""}`} onClick={() => setSel(i)} onDoubleClick={() => onChoose(c)}>
+              <CardImage code={c.card.code} />
+              <span className="md-dialog-info" onClick={(e) => { e.stopPropagation(); onInspect(c.card.code); }}>ⓘ</span>
+            </button>
+          ))}
+        </div>
+        <div className="md-dialog-actions">
+          <button className="md-btn" onClick={onCancel}>Annuler</button>
+          <button className="md-btn" disabled={sel < 0} onClick={() => sel >= 0 && onChoose(choices[sel])}>Choisir</button>
+        </div>
+      </div>
+    </div>
   );
 }
 

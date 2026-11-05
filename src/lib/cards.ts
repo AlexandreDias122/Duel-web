@@ -37,6 +37,7 @@ export class CardDb {
   readonly searchable: Card[] = [];
 
   constructor(raw: RawCard[], readonly strings: Strings) {
+    for (const [k, v] of Object.entries(strings.system)) strings.system[Number(k)] = fixFrench(v);
     for (const [id, ot, alias, setcode, type, atk, def, level, race, attribute, name, desc, strs, category] of raw) {
       const isLink = (type & TYPE.LINK) !== 0;
       this.cards.set(id, {
@@ -93,6 +94,16 @@ export class CardDb {
     }
     return out;
   }
+}
+
+/** Accents oubliés et « & » de la traduction française d'EDOPro, écrits comme dans Master Duel. */
+const FRENCH_FIXES: [RegExp, string][] = [
+  [/Magie & Pi[eè]ge/g, "Magie/Piège"], [/\bPiege\b/g, "Piège"], [/\bpeut-etre\b/g, "peut-être"], [/\betre\b/g, "être"],
+  [/\bparametres\b/g, "paramètres"], [/\bhote\b/g, "hôte"], [/\bcontroleur\b/g, "contrôleur"], [/\bcarte\(s\) a /g, "carte(s) à "],
+  [/([^ ])\?$/, "$1 ?"],
+];
+export function fixFrench(text: string): string {
+  return FRENCH_FIXES.reduce((t, [re, to]) => t.replace(re, to), text);
 }
 
 export function isMonster(c: Card) { return (c.type & TYPE.MONSTER) !== 0; }

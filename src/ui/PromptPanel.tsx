@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { OcgMessageType as T, OcgResponseType as R, cardMatchesOpcode } from "ocgcore-wasm";
 import type { OcgMessage, OcgResponse, OcgCardLoc } from "ocgcore-wasm";
 import type { Prompt } from "../engine/controller";
@@ -14,10 +14,14 @@ interface Props {
   playerLabel: string;
   /** Carte à laquelle on répond (dernier maillon de la chaîne), pour situer la question. */
   respondingTo?: number;
+  /** Carte adverse à garder secrète : affichée de dos, sans nom. */
+  hidden?: (c: OcgCardLoc) => boolean;
 }
 
+const HiddenCtx = createContext<(c: OcgCardLoc) => boolean>(() => false);
+
 /** Fenêtre de question pour tout ce qui ne se joue pas directement sur le terrain. */
-export function PromptPanel({ prompt, respond, inspect, playerLabel, respondingTo }: Props) {
+export function PromptPanel({ prompt, respond, inspect, playerLabel, respondingTo, hidden: isHidden }: Props) {
   const [hidden, setHidden] = useState(false);
   const db = useDb();
   const m = prompt.message;
@@ -31,6 +35,7 @@ export function PromptPanel({ prompt, respond, inspect, playerLabel, respondingT
       </button>
     );
   return (
+    <HiddenCtx.Provider value={isHidden ?? (() => false)}>
     <div className="sheet prompt">
       <div className="sheet-head">
         <div>
@@ -45,6 +50,7 @@ export function PromptPanel({ prompt, respond, inspect, playerLabel, respondingT
       </div>
       {body}
     </div>
+    </HiddenCtx.Provider>
   );
 }
 
@@ -182,14 +188,15 @@ function renderBody(m: OcgMessage, respond: (r: OcgResponse) => void, inspect: (
 
 function CardTile({ c, selected, onClick, onInspect }: { c: OcgCardLoc; selected?: boolean; onClick: () => void; onInspect: (code: number) => void }) {
   const db = useDb();
+  const secret = useContext(HiddenCtx)(c);
   return (
     <div className={`pick ${selected ? "picked" : ""}`}>
       <button className="pick-card" onClick={onClick}>
-        <CardImage code={c.code} />
+        <CardImage code={c.code} back={secret} />
         {selected && <span className="pick-check">✓</span>}
       </button>
-      <button className="pick-info" onClick={() => c.code && onInspect(c.code)}>
-        <span className="pick-name">{db.get(c.code)?.name ?? "Face cachée"}</span>
+      <button className="pick-info" onClick={() => !secret && c.code && onInspect(c.code)}>
+        <span className="pick-name">{secret ? "Carte face cachée" : db.get(c.code)?.name ?? "Face cachée"}</span>
         <span className="pick-loc">{locationName(c.location)}{c.controller !== undefined ? "" : ""}</span>
       </button>
     </div>

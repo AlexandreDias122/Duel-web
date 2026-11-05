@@ -17,6 +17,8 @@ export interface FieldProps {
   targets: Set<string>;
   /** Montrer les cartes face cachée de l'adversaire (mode solo). */
   revealAll: boolean;
+  /** Carte adverse à garder secrète (face cachée non révélée…). */
+  hidden: (c: { controller: number; location: number; sequence: number }) => boolean;
   onCard: (controller: number, location: number, sequence: number, card: FieldCard) => void;
   onZone: (controller: number, location: number, sequence: number) => void;
   onPile: (controller: number, location: number) => void;
@@ -114,7 +116,8 @@ function Zone(p: FieldProps & { player: number; location: number; seq: number; e
   ].join(" ");
   return (
     <div className={cls} data-zone={key} onClick={() => (selectable ? p.onZone(p.player, p.location, p.seq) : card && p.onCard(p.player, p.location, p.seq, card))}>
-      {card && <FieldCardView card={card} opp={opp} reveal={!opp || p.revealAll} monsterZone={p.location === LOC.MZONE} />}
+      {selectable && <div className="sel-squares"><i /><i /><i /></div>}
+      {card && <FieldCardView card={card} opp={opp} reveal={!opp || p.revealAll || !p.hidden({ controller: p.player, location: p.location, sequence: p.seq })} monsterZone={p.location === LOC.MZONE} />}
       {fx.map((f) => (
         <div key={f.id} className={`zfx ${f.cls}-layer`}>
           {f.cls === "fx-leave" && f.code > 0 && <CardImage code={f.code} />}
@@ -157,6 +160,7 @@ function Pile(p: FieldProps & { player: number; location: number }) {
   const actionable = list?.some((_, i) => p.actionable.has(cardKey(p.player, p.location, i)));
   return (
     <div className={`pile pile-${p.location === LOC.DECK ? "deck" : p.location === LOC.EXTRA ? "extra" : p.location === LOC.GRAVE ? "gy" : "ban"} ${actionable ? "zone-actionable" : ""} ${p.player !== p.viewer ? "zone-opp" : ""}`} data-pile={`${p.player}-${p.location}`} onClick={() => p.onPile(p.player, p.location)}>
+      {actionable && <div className={`pile-ring ${p.location === LOC.EXTRA || p.location === LOC.DECK ? "pile-ring-card" : ""}`}><i /><i /></div>}
       <div className={`socket socket-${p.location === LOC.GRAVE ? "gy" : p.location === LOC.REMOVED ? "ban" : p.location === LOC.EXTRA ? "extra" : "deck"}`} />
       {/* Cimetière et bannis : la carte s'engouffre dans le socle, seul le compteur reste (Master Duel). */}
       {count > 0 && !faceUp && <div className="pile-stack pile-thick"><CardImage code={top?.code ?? 0} back={!(top && top.position & POS.FACEUP)} /></div>}
