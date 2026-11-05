@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { Board3D } from "./board3d";
 
 /**
- * Plateau 3D affiché derrière le terrain CSS (même élément parent, qui porte la perspective).
+ * Plateau 3D affiché en fond de l'écran de duel, aligné sur le tapis CSS de `.duel-board`.
  * `onReady` signale que la scène est prête, pour rendre le tapis CSS transparent.
  */
 export function Board3DLayer({ onReady }: { onReady: (ready: boolean) => void }) {
@@ -13,27 +12,23 @@ export function Board3DLayer({ onReady }: { onReady: (ready: boolean) => void })
 
   useEffect(() => {
     const canvas = ref.current;
-    const board = canvas?.parentElement;
+    const board = canvas?.parentElement?.querySelector<HTMLElement>(".duel-board");
     if (!canvas || !board) return;
-    let scene: Board3D | null = null;
     let cancelled = false;
     let ro: ResizeObserver | null = null;
-    const onTap = (e: PointerEvent) => {
-      // Seulement hors des zones et des boutons : le lapin ne doit pas voler une touche destinée au jeu.
-      if (!(e.target as Element).closest(".cell, button")) scene?.poke(e.clientX, e.clientY);
-    };
+    let dispose = () => {};
     import("./board3d")
       .then(({ createBoard3D }) => createBoard3D(canvas, board))
       .then((s) => {
         if (cancelled) return s.dispose();
-        scene = s;
+        dispose = () => s.dispose();
         readyRef.current(true);
-        // La mise en page change avec la taille de l'écran et quand le terrain apparaît : on suit les deux.
+        // La mise en page change avec la taille de l'écran et quand le terrain apparaît : on suit tout.
         ro = new ResizeObserver(() => s.layout());
+        ro.observe(canvas);
         ro.observe(board);
         const mat = board.querySelector(".mat");
         if (mat) ro.observe(mat);
-        board.addEventListener("pointerdown", onTap);
       })
       .catch((err) => {
         console.warn("Plateau 3D indisponible", err);
@@ -42,8 +37,7 @@ export function Board3DLayer({ onReady }: { onReady: (ready: boolean) => void })
     return () => {
       cancelled = true;
       ro?.disconnect();
-      board.removeEventListener("pointerdown", onTap);
-      scene?.dispose();
+      dispose();
       readyRef.current(false);
     };
   }, []);

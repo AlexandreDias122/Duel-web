@@ -965,12 +965,41 @@ select, input.search, .filters input {
 }
 @keyframes chat-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
 
-/* ===== Plateau 3D (forêt) sous le terrain : le tapis CSS devient transparent ===== */
-.board-3d { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* ===== Terrain façon Master Duel : zones aux emplacements du plateau 3D (forêt) =====
+   --u = taille en px d'une unité du modèle 3D ; positions des zones dans Field.tsx (SLOT). */
+.duel { isolation: isolate; }
+.board-3d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
 .tool-off { opacity: 0.45; }
-.has-3d .mat { background: none; box-shadow: none; }
+.duel-board {
+  --u: min(calc((100vw - 8px) / 64), calc((100dvh - var(--safe-top) - var(--safe-bottom) - 290px) / 50));
+  perspective: 1400px; perspective-origin: 50% 50%;
+}
+.duel-wide .duel-board, .duel-wide .duel-board:not(#_) {
+  inset: 0;
+  --u: min(calc((100vw - 16px) / 66), calc((100dvh - var(--safe-top) - var(--safe-bottom)) / 55));
+}
+.mat {
+  flex: none; padding: 0; width: calc(var(--u) * 64); height: calc(var(--u) * 56);
+  transform: rotateX(24deg); transform-origin: 50% 50%;
+}
+.field {
+  display: block; position: absolute; inset: 0;
+  --cw: calc(var(--u) * 6.86); --ch: calc(var(--cw) * 1.46);
+}
+.cell { position: absolute; width: 0; height: 0; display: flex; align-items: center; justify-content: center; }
+.zone { width: calc(var(--u) * 7.8); height: calc(var(--u) * 7.8); flex: none; }
+.pile { flex: none; }
+/* Bouton de phase à droite, entre les deux camps, comme sur le plateau d'origine */
+.duel-board .phase-wrap, .duel-board .phase-wrap:not(#_) { left: calc(50% + var(--u) * 24); right: auto; top: 50%; translate: -50% -50%; }
+.card-back { background: #2e1406 url("./assets/card-back.webp") center / cover no-repeat; border: none; box-shadow: none; }
+
+/* Avec le plateau 3D : les zones sont peintes sur le modèle, seules les cases à choisir s'allument. */
+.has-3d .mat { background: none; box-shadow: none; border-radius: 0; }
 .has-3d .mat::after { display: none; }
-/* Les zones du modèle sont peintes sur le plateau : on ne garde qu'un léger contour des zones CSS. */
-.has-3d .zone::before { opacity: 0.12; }
-.has-3d .zone::after { border-color: transparent; }
-.has-3d .zone-selectable::before, .has-3d .zone-chosen::before { opacity: 0.85; }
+.has-3d .zone::before { opacity: 0; }
+.has-3d .zone::after { display: none; }
+.has-3d .zone-selectable::before, .has-3d .zone-chosen::before { opacity: 0.8; }
+.has-3d .zone-selectable::after { display: block; }
+.has-3d .socket { display: none; }
+/* Téléphone à l'horizontale : pas de fiche permanente, le terrain prend toute la largeur. */
+.duel-nopanel { --panel-w: 0px; }
