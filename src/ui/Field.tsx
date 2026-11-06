@@ -11,6 +11,8 @@ export interface FieldProps {
   viewer: number;
   /** Cartes ayant une action possible (clé cardKey). */
   actionable: Set<string>;
+  /** Cartes qui ne peuvent qu'être invoquées normalement, posées ou changer de position (liseré bleu). */
+  actionBlue: Set<string>;
   /** Zones sélectionnables pour SELECT_PLACE (clé cardKey). */
   zones: Set<string>;
   chosenZones: Set<string>;
@@ -106,10 +108,12 @@ function Zone(p: FieldProps & { player: number; location: number; seq: number; e
     "zone",
     p.location === LOC.MZONE ? "zone-m" : "zone-s",
     p.location === LOC.SZONE && p.seq === 5 ? "zone-field" : "",
-    p.emz || p.seq >= 5 ? "zone-emz" : "",
+    p.location === LOC.MZONE && (p.emz || p.seq >= 5) ? "zone-emz" : "",
     selectable ? "zone-selectable" : "",
     chosen ? "zone-chosen" : "",
     card && p.actionable.has(key) ? "zone-actionable" : "",
+    card && p.actionBlue.has(key) ? "act-blue" : "",
+    p.location === LOC.SZONE && (p.seq === 0 || p.seq === 4) ? "zone-pz" : "",
     card && p.targets.has(key) ? "zone-target" : "",
     opp ? "zone-opp" : "",
     ...fx.map((f) => f.cls),

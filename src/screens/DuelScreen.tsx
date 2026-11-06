@@ -15,7 +15,7 @@ import { cardActions, placeZones } from "../ui/promptLogic";
 import type { CardAction } from "../ui/promptLogic";
 import { useDb } from "../ui/dbContext";
 import { Board3DLayer } from "../ui/Board3DLayer";
-import { board3dEnabled, setBoard3dEnabled } from "../ui/board3dPrefs";
+import { board3dEnabled, fileToPlaymat, playmatImage, setBoard3dEnabled, setPlaymatImage } from "../ui/board3dPrefs";
 
 interface Props {
   mode: DuelMode;
@@ -61,6 +61,8 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   // Plateau 3D (forêt + compagnon) : activé par défaut, désactivable pour les appareils modestes.
   const [use3d, setUse3d] = useState(board3dEnabled);
   const [ready3d, setReady3d] = useState(false);
+  const [playmat, setPlaymat] = useState(playmatImage);
+  const [showMat, setShowMat] = useState(false);
   const [chosenZones, setChosenZones] = useState<string[]>([]);
   /** Boutons « Activer Effet » / « Invocation Spéciale » au-dessus d'une pile (Cimetière, Extra Deck…) qui a des cartes jouables. */
   const [pileMenu, setPileMenu] = useState<PileView>(null);
@@ -88,6 +90,8 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   }, [msg]);
 
   const actions = useMemo(() => cardActions(msg, db), [msg, db]);
+  // Liseré bleu (Master Duel) : la carte ne peut qu'être invoquée normalement, posée ou changer de position.
+  const blue = useMemo(() => new Set([...actions].filter(([, list]) => list.every((a) => BLUE_KINDS.has(actionKind(a.label)))).map(([k]) => k)), [actions]);
 
   // La fiche suit la dernière carte jouée, tant que le joueur n'en touche pas une autre.
   const lastFx = [...view.fx].reverse().find((f) => "code" in f && f.code > 0 && f.kind !== "leave" && f.kind !== "bury" && f.kind !== "travel"
@@ -199,7 +203,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
           const key = cardKey(player, LOC.HAND, i);
           const act = actions.has(key);
           return (
-            <div key={i} className={`hand-card ${arriving.has(`${player}-${i}`) ? "hand-arriving" : ""} ${act ? "zone-actionable" : ""} ${targets.has(key) ? "zone-target" : ""} ${menu?.key === key ? "menu-open" : ""}`}
+            <div key={i} className={`hand-card ${arriving.has(`${player}-${i}`) ? "hand-arriving" : ""} ${act ? "zone-actionable" : ""} ${act && blue.has(key) ? "act-blue" : ""} ${targets.has(key) ? "zone-target" : ""} ${menu?.key === key ? "menu-open" : ""}`}
               onClick={() => visible || c.isPublic ? onCard(player, LOC.HAND, i, c) : undefined}>
               <CardImage code={c.code} back={!visible && !c.isPublic} />
             </div>
@@ -273,8 +277,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
         <div className="top-tools">
           <button className="tool" onClick={() => confirm("Abandonner le duel ?") && onExit()} title="Quitter">✕</button>
           <button className="tool" onClick={() => setShowLog(!showLog)} title="Journal">☰</button>
-          <button className={`tool ${use3d ? "" : "tool-off"}`} title={use3d ? "Plateau 3D : activé" : "Plateau 3D : désactivé"}
-            onClick={() => { setBoard3dEnabled(!use3d); setUse3d(!use3d); }}>3D</button>
+          <button className="tool" title="Terrain : plateau 3D ou tapis" onClick={() => setShowMat(true)}>▦</button>
         </div>
         {handFor(1 - viewer, op.hand, true)}
         <LpPlate name={label(1 - viewer)} lp={op.lp} max={lp} active={!myTurn} side="op" thinking={view.thinking} />
@@ -282,11 +285,13 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
         {view.chat && view.chat.player !== viewer && <div key={view.chat.id} className="bot-chat">{view.chat.text}</div>}
       </div>
 
-      <div className={`duel-board ${use3d && ready3d ? "has-3d" : ""}`}>
+      <div className={`duel-board ${use3d && ready3d ? "has-3d" : ""} ${playmat ? "has-playmat" : ""}`}
+        style={playmat ? ({ "--playmat": `url("${playmat}")` } as React.CSSProperties) : undefined}>
         <Field
           state={state}
           viewer={viewer}
           actionable={new Set(actions.keys())}
+          actionBlue={blue}
           zones={zones}
           chosenZones={new Set(chosenZones)}
           targets={targets}
@@ -474,6 +479,21 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
         </div>
       )}
 
+      {showMat && (
+        <MatSheet
+          use3d={use3d}
+          playmat={playmat}
+          onClose={() => setShowMat(false)}
+          on3d={(on) => { setBoard3dEnabled(on); setUse3d(on); }}
+          onPlaymat={(url) => {
+            if (!setPlaymatImage(url)) alert("Image trop lourde pour être gardée sur cet appareil : elle ne restera que pour ce duel.");
+            setPlaymat(url);
+            // Le tapis se voit sans le plateau 3D.
+            if (url && use3d) { setBoard3dEnabled(false); setUse3d(false); }
+          }}
+        />
+      )}
+
       {showLog && (
         <div className="log" ref={logRef}>
           {view.log.map((l, i) => <div key={i} className={l.player === viewer ? "log-me" : l.player === 1 - viewer ? "log-op" : "log-sys"}>{l.text}</div>)}
@@ -508,6 +528,44 @@ function useMediaQuery(query: string): boolean {
     return () => mq.removeEventListener("change", on);
   }, [query]);
   return match;
+}
+
+const BLUE_KINDS = new Set(["summon", "set", "position"]);
+
+/** Réglages du terrain : plateau 3D, ou tapis 2D avec une image de fond au choix. */
+function MatSheet({ use3d, playmat, on3d, onPlaymat, onClose }: {
+  use3d: boolean; playmat: string | null; on3d: (on: boolean) => void; onPlaymat: (url: string | null) => void; onClose: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet mat-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <strong>Terrain</strong>
+          <button className="ghost" onClick={onClose}>✕</button>
+        </div>
+        <div className="segmented">
+          <button className={!use3d ? "on" : ""} onClick={() => on3d(false)}>Tapis</button>
+          <button className={use3d ? "on" : ""} onClick={() => on3d(true)}>Plateau 3D (forêt)</button>
+        </div>
+        <div className={`mat-preview ${playmat ? "" : "mat-preview-default"}`} style={playmat ? { backgroundImage: `url("${playmat}")` } : undefined} />
+        <p className="muted small">Choisissez n'importe quelle image (paysage de préférence) : elle devient le fond du tapis, sous les zones.</p>
+        <input ref={input} type="file" accept="image/*" hidden onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          setBusy(true);
+          try { onPlaymat(await fileToPlaymat(file)); } catch { alert("Impossible de lire cette image."); }
+          setBusy(false);
+        }} />
+        <div className="sheet-actions">
+          <button className="primary" disabled={busy} onClick={() => input.current?.click()}>{busy ? "Chargement…" : "Choisir une image"}</button>
+          {playmat && <button onClick={() => onPlaymat(null)}>Tapis gris par défaut</button>}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const ACTION_ICONS: Record<string, string> = {
