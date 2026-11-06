@@ -63,6 +63,12 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   const [ready3d, setReady3d] = useState(false);
   const [playmat, setPlaymat] = useState(playmatImage);
   const [showMat, setShowMat] = useState(false);
+  // Avance rapide façon Master Duel : accélère les enchaînements de l'adversaire (et du duel en général).
+  const [fast, setFast] = useState(() => { try { return localStorage.getItem("duelweb-fast") === "1"; } catch { return false; } });
+  useEffect(() => {
+    controller.setSpeed(fast ? 3 : 1);
+    try { localStorage.setItem("duelweb-fast", fast ? "1" : "0"); } catch { /* réglage non mémorisé */ }
+  }, [fast, controller]);
   const [chosenZones, setChosenZones] = useState<string[]>([]);
   /** Boutons « Activer Effet » / « Invocation Spéciale » au-dessus d'une pile (Cimetière, Extra Deck…) qui a des cartes jouables. */
   const [pileMenu, setPileMenu] = useState<PileView>(null);
@@ -201,9 +207,12 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
       <div className={`hand ${top ? "hand-top" : ""}`} data-hand={player}>
         {cards.map((c, i) => {
           const key = cardKey(player, LOC.HAND, i);
+          // Éventail : les cartes s'inclinent de part et d'autre du centre de la main.
+          const fan = i - (cards.length - 1) / 2;
           const act = actions.has(key);
           return (
             <div key={i} className={`hand-card ${arriving.has(`${player}-${i}`) ? "hand-arriving" : ""} ${act ? "zone-actionable" : ""} ${act && blue.has(key) ? "act-blue" : ""} ${targets.has(key) ? "zone-target" : ""} ${menu?.key === key ? "menu-open" : ""}`}
+              style={{ "--fan": fan, "--fan2": fan * fan } as React.CSSProperties}
               onClick={() => visible || c.isPublic ? onCard(player, LOC.HAND, i, c) : undefined}>
               <CardImage code={c.code} back={!visible && !c.isPublic} />
             </div>
@@ -367,6 +376,12 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
           <div className="banner">{prompt?.hint || "Choisissez une zone"} ({chosenZones.length}/{msg.count})</div>
         )}
       </div>
+
+      {mode === "ai" && (
+        <button className={`speed-btn ${fast ? "on" : ""}`} onClick={() => setFast(!fast)} title={fast ? "Vitesse normale" : "Accélérer"}>
+          <span>▶▶</span>{fast && <small>×3</small>}
+        </button>
+      )}
 
       <div className="duel-bottom">
         {handFor(viewer, me.hand, false)}

@@ -90,6 +90,8 @@ export class DuelController {
   private fxId = 0;
   private promptId = 0;
   private chatId = 0;
+  /** Accélération des temps morts (combos de l'adversaire) : 1 = normal. */
+  speed = 1;
   view: DuelView = { loading: "Démarrage du moteur…", state: null, prompt: null, log: [], fx: [], thinking: false, end: null, error: null, clock: null, chat: null, known: new Set() };
 
   /** turnSeconds : temps de réflexion par tour (0 = illimité). */
@@ -119,6 +121,15 @@ export class DuelController {
     this.stopClock();
     this.set({ prompt: null });
     this.send({ kind: "respond", duel: this.id, response });
+  }
+
+  setSpeed(speed: number) {
+    this.speed = speed;
+    // On relance tout de suite la file si elle attendait.
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.drain();
+    }
   }
 
   dispose() {
@@ -214,7 +225,7 @@ export class DuelController {
         this.set({ end: { winner: m.winner, reason: m.reason }, prompt: null, thinking: false });
       }
       if (pause) {
-        this.timer = setTimeout(() => this.drain(), pause);
+        this.timer = setTimeout(() => this.drain(), pause / this.speed);
         return;
       }
     }
@@ -225,7 +236,7 @@ export class DuelController {
     this.set({ fx: [...this.view.fx, fx] });
     setTimeout(() => {
       if (!this.disposed) this.set({ fx: this.view.fx.filter((x) => x.id !== fx.id) });
-    }, FX_LIFETIME[fx.kind]);
+    }, FX_LIFETIME[fx.kind] / Math.min(this.speed, 2));
   }
 
   private fxFor(msg: OcgMessage, state: DuelState): FxInput[] {
