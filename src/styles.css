@@ -1163,3 +1163,65 @@ select, input.search, .filters input {
 .yn-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .yn-context { font-size: 12px; color: var(--muted); }
 .yn-effect { font-size: 12px; line-height: 1.35; max-height: 96px; overflow-y: auto; padding: 6px 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.3); color: #d8deea; white-space: pre-line; }
+
+/* ===== Tapis 2D façon « Simple Gray Playmat » de Master Duel (plateau 3D désactivé) ===== */
+.duel-board:not(.has-3d) .mat {
+  border-radius: calc(var(--u) * 1.2);
+  background:
+    linear-gradient(180deg, transparent 49.6%, rgba(0, 0, 0, 0.35) 49.8%, rgba(255, 255, 255, 0.12) 50.2%, transparent 50.4%),
+    radial-gradient(ellipse 70% 60% at 50% 45%, #5d5e60 0%, #3f4042 55%, #2a2b2d 100%);
+  box-shadow: 0 30px 50px -10px rgba(0, 0, 0, 0.8), inset 0 0 calc(var(--u) * 3) rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+/* Image choisie par le joueur : elle couvre tout le tapis, les zones se dessinent par-dessus */
+.duel-board.has-playmat:not(.has-3d) .mat {
+  background: linear-gradient(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.12)), var(--playmat) center / cover no-repeat, #333;
+}
+.duel-board:not(.has-3d) .mat::after { display: none; }
+.duel { background-color: #101114; }
+/* Zones : simples cadres blancs */
+.duel-board:not(.has-3d) .zone::before {
+  inset: calc(var(--u) * -0.2); clip-path: none; border-radius: calc(var(--u) * 0.3); opacity: 1; filter: none;
+  background: rgba(255, 255, 255, 0.03); border: max(1.5px, calc(var(--u) * 0.22)) solid rgba(240, 242, 245, 0.88);
+  box-shadow: 0 0 calc(var(--u) * 0.4) rgba(0, 0, 0, 0.55), inset 0 0 calc(var(--u) * 0.4) rgba(0, 0, 0, 0.35);
+}
+.duel-board:not(.has-3d) .zone::after { display: none; }
+/* Pictos : losange sur les zones Pendule, étoile sur la Zone Terrain, flèches sur les Zones Monstre Extra */
+.duel-board:not(.has-3d) .zone-pz::after, .duel-board:not(.has-3d) .zone-field::after, .duel-board:not(.has-3d) .zone-emz::after {
+  display: block; content: ""; position: absolute; border: none; border-radius: 0; transform: none; z-index: 0; opacity: 0.92;
+  background: center / contain no-repeat;
+}
+.duel-board:not(.has-3d) .zone-pz::after {
+  inset: 30% 14%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 60'%3E%3Cpath d='M50 4 96 30 50 56 4 30Z' fill='none' stroke='white' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.duel-board:not(.has-3d) .zone-field::after {
+  inset: 18%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 3 58 42 97 50 58 58 50 97 42 58 3 50 42 42Z' fill='none' stroke='white' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M50 22 55 45 78 50 55 55 50 78 45 55 22 50 45 45Z' fill='white'/%3E%3C/svg%3E");
+}
+.duel-board:not(.has-3d) .zone-emz::after {
+  inset: 10%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='white' stroke-width='4'%3E%3Cpath d='M14 32V14H32M68 14H86V32M86 68V86H68M32 86H14V68'/%3E%3Cpath d='M41 13 50 4 59 13ZM87 41 96 50 87 59ZM41 87 50 96 59 87ZM13 41 4 50 13 59Z' fill='white' stroke='none'/%3E%3C/svg%3E");
+}
+.duel-board:not(.has-3d) .zone-selectable::before { border-color: #fff36b; }
+.duel-board:not(.has-3d) .zone-chosen::before { border-color: #fff; }
+/* Socles du Cimetière et des bannis en pierre grise, assortis au tapis */
+.duel-board:not(.has-3d) .socket-gy, .duel-board:not(.has-3d) .socket-ban {
+  background: radial-gradient(circle, #050608 0 42%, #2a2d31 46%, #4a4f55 56% 66%, #2b2e32 70%, transparent 73%);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+}
+
+/* Liseré bleu : la carte peut être invoquée normalement, posée ou changer de position (le jaune reste pour les effets) */
+.zone-actionable.act-blue .fcard, .hand-card.zone-actionable.act-blue .card-img {
+  animation: md-playable-blue 1.2s ease-in-out infinite;
+}
+@keyframes md-playable-blue {
+  0%, 100% { filter: brightness(1); box-shadow: 0 0 0 2px #9fe4ff, 0 0 8px 2px #3cb4ff, 0 0 18px 4px rgba(30, 120, 255, 0.55); }
+  50% { filter: brightness(1.1); box-shadow: 0 0 0 2px #e0f6ff, 0 0 14px 4px #5cc8ff, 0 0 28px 8px rgba(40, 140, 255, 0.85); }
+}
+
+/* Réglages du terrain */
+.mat-sheet .segmented { display: flex; gap: 8px; margin: 4px 0 10px; }
+.mat-sheet .segmented button { flex: 1; }
+.mat-preview { height: 140px; border-radius: 10px; background: #333 center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
+.mat-preview-default { background: radial-gradient(ellipse 70% 60% at 50% 45%, #5d5e60 0%, #3f4042 55%, #2a2b2d 100%); }
+.duel-board:not(.has-3d) .socket-deck, .duel-board:not(.has-3d) .socket-extra { display: none; }
