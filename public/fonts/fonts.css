@@ -30,6 +30,14 @@
   src: url("DWTitle-Bold.woff2") format("woff2");
 }
 
+/* Bouton de phase (« Turn 1 / Main 1 ») : police du bouton dans les fichiers du jeu,
+   réduite aux seuls caractères affichés (Turn, Draw, Standby, Main, Battle, End, chiffres). */
+@font-face {
+  font-family: "DW Phase";
+  font-display: block;
+  src: url("DWPhase.woff2") format("woff2");
+}
+
 /* Interface : Rodin Pro DB (texte courant) et RodinNTLG Pro B (gras) */
 @font-face {
   font-family: "DW Rodin";
