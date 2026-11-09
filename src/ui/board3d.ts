@@ -16,8 +16,6 @@ const PEDESTALS: [string, THREE.Vector3][] = [
 export interface Board3D {
   /** Recalcule la caméra pour coller au terrain CSS (à appeler quand la mise en page change). */
   layout(): void;
-  /** Bouton de phase : face bleue (rond) pendant notre tour, face rouge (hexagone) pendant celui de l'adversaire. */
-  setTurn(mine: boolean): void;
   dispose(): void;
 }
 
@@ -33,27 +31,24 @@ export async function createBoard3D(canvas: HTMLCanvasElement, board: HTMLElemen
   camera.matrixAutoUpdate = false;
 
   const loader = new GLTFLoader();
-  // Minuteur et bouton de phase : déjà placés dans leur modèle (bord gauche et bord droit, entre les deux camps).
-  const files = ["forest_near.glb", "forest_far.glb", ...PEDESTALS.map(([f]) => f), "timer.glb", "phase_button.glb"];
+  // Minuteur : déjà placé dans son modèle (bord gauche, entre les deux camps).
+  // Le bouton de phase n'est pas en 3D : c'est le même médaillon (image) que sur le tapis 2D, posé par-dessus.
+  const files = ["forest_near.glb", "forest_far.glb", ...PEDESTALS.map(([f]) => f), "timer.glb"];
   const gltfs = await Promise.all(files.map((f) => loader.loadAsync(MODELS + f)));
 
   // Le plateau d'origine n'est pas éclairé (shaders « Unlit ») : matériaux de base.
   const field = new THREE.Group();
   field.matrixAutoUpdate = false;
-  const PHASE_INDEX = files.length - 1;
   gltfs.forEach((g, i) => {
     g.scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       const src = mesh.material as THREE.MeshStandardMaterial;
       // Le cadran du minuteur (shader animé à l'origine, sans texture) devient un verre bleu nuit sous le texte.
-      // Le bouton de phase garde sa texture : sphère bleue (notre tour) ou rouge (tour adverse), comme dans le jeu.
-      const phase = i === PHASE_INDEX && !/shadow/i.test(mesh.name);
-      const glass = i >= 2 + PEDESTALS.length && !phase && (!src.map || /surface/i.test(mesh.name));
+      const glass = i >= 2 + PEDESTALS.length && (!src.map || /surface/i.test(mesh.name));
       mesh.material = new THREE.MeshBasicMaterial({
         map: src.map, color: glass ? new THREE.Color(0x0b1b3a) : src.color, side: THREE.DoubleSide,
-        // Bouton de phase : l'alpha de sa texture est un masque d'effet (sphère à 20 %), pas une transparence.
-        transparent: phase ? false : src.transparent, alphaTest: phase ? 0 : src.alphaTest, depthWrite: phase || !src.transparent,
+        transparent: src.transparent, alphaTest: src.alphaTest, depthWrite: !src.transparent,
       });
       src.dispose();
     });
@@ -62,7 +57,6 @@ export async function createBoard3D(canvas: HTMLCanvasElement, board: HTMLElemen
     field.add(g.scene);
   });
   scene.add(field);
-  const phaseParts = { mine: gltfs[PHASE_INDEX].scene.getObjectByName("PlayerPart_8c83"), op: gltfs[PHASE_INDEX].scene.getObjectByName("OpponentPart_91a6") };
 
   // ---- Alignement sur la mise en page CSS ----
   const layout = () => {
@@ -116,13 +110,6 @@ export async function createBoard3D(canvas: HTMLCanvasElement, board: HTMLElemen
 
   return {
     layout,
-    setTurn(mine) {
-      if (!phaseParts.mine || !phaseParts.op) return;
-      // À l'origine, la face inactive est réduite à 10 % (elle « éclot » au changement de tour).
-      phaseParts.mine.scale.setScalar(mine ? 1 : 0.1);
-      phaseParts.op.scale.setScalar(mine ? 0.1 : 1);
-      layout();
-    },
     dispose() {
       scene.traverse((o) => {
         const mesh = o as THREE.Mesh;
