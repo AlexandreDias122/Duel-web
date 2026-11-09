@@ -1271,3 +1271,105 @@ select, input.search, .filters input {
 }
 .duel-board .phase-orb b { font-size: clamp(10px, calc(var(--u) * 1.45), 18px); }
 .duel-board .phase-orb small { font-size: clamp(7px, calc(var(--u) * 1), 12px); }
+
+/* ===== Interface de duel façon Master Duel (assets du jeu : boutons d'action, menu de phase, socles, compteurs) ===== */
+/* Boutons d'action ronds au-dessus de la carte, libellé en dessous */
+.action-menu { flex-direction: column-reverse; align-items: center; gap: 8px; }
+.action-card { width: clamp(60px, min(16vw, 24dvh), 130px); flex: none; }
+.action-card .card-img { width: 100%; }
+.action-buttons { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: clamp(8px, 2vw, 20px); }
+.md-act {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; width: clamp(78px, 13vw, 118px); padding: 0; border: none; background: none; box-shadow: none;
+  color: #fff; font: 700 clamp(12px, 1.9vw, 17px)/1.1 var(--font-ui); text-align: center; letter-spacing: -0.01em;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 0 2px 4px rgba(0, 0, 0, 0.9); animation: md-act-in 0.18s ease-out both;
+}
+.md-act img { width: clamp(58px, 10vw, 88px); height: auto; aspect-ratio: 1; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6)); transition: transform 0.12s, filter 0.12s; }
+.md-act:hover img { filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6)) brightness(1.15); }
+.md-act:active img { transform: scale(0.92); filter: brightness(1.3); }
+.md-act + .md-act { animation-delay: 0.04s; }
+@keyframes md-act-in { from { opacity: 0; transform: translateY(8px) scale(0.85); } to { opacity: 1; transform: none; } }
+/* Choix de la position à l'invocation : mêmes boutons ronds */
+.position-list { gap: clamp(10px, 3vw, 32px); }
+.position-list .md-act, .position-list .md-act:not(#_) { width: clamp(110px, 18vw, 150px); background: none; border: none; box-shadow: none; padding: 0; font-size: clamp(12px, 1.8vw, 16px); }
+
+/* Menu de phase */
+.phase-dialog { width: min(96vw, 940px); }
+.phase-steps {
+  display: flex; align-items: center; justify-content: center; padding: clamp(14px, 3vw, 34px) 8px; border-radius: 4px;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 5px), linear-gradient(180deg, #123a66, #0a2240 60%, #0b2a52);
+}
+.phase-dash { flex: 0 1 18px; min-width: 4px; height: 2px; background: rgba(200, 215, 230, 0.45); }
+.phase-step, .phase-step:not(#_) {
+  position: relative; flex: 0 1 auto; width: clamp(52px, 12vw, 128px); aspect-ratio: 1; border-radius: 50%; border: none; padding: 0; background: none; box-shadow: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4%; color: #fff; opacity: 1;
+  font: 600 clamp(10px, 2.1vw, 21px)/1 var(--font-ui);
+}
+.phase-step::before { content: ""; position: absolute; inset: 5%; border-radius: 50%; background: var(--ph-base) center / 100% 100% no-repeat; opacity: 0.32; }
+.phase-step::after { content: ""; position: absolute; inset: 0; background: var(--ph-ring) center / 100% 100% no-repeat; opacity: 0.95; }
+.phase-step > * { position: relative; z-index: 1; }
+.phase-ico { width: 34%; aspect-ratio: 1; background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+.phase-step:disabled, .phase-step:disabled:not(#_) { color: rgba(170, 180, 190, 0.4); cursor: default; }
+.phase-menu-backdrop .md-btn { font: 700 17px var(--font-ui); font-style: normal; }
+.phase-step:disabled::before { opacity: 0.12; }
+.phase-step:disabled::after { opacity: 0.35; }
+.phase-step.avail:hover::before { opacity: 0.5; }
+.phase-step.avail:active { transform: scale(0.95); }
+.phase-step.current, .phase-step.current:not(#_) { color: #dcff2a; }
+.phase-step.current::after { background-image: var(--ph-cursor); opacity: 1; filter: drop-shadow(0 0 6px rgba(210, 255, 40, 0.7)); }
+.phase-step.current::before { opacity: 0.18; }
+
+/* Liserés jaune (effets) et bleu (invoquer/poser/changer de position) : plus épais, pulsation et reflet qui tourne */
+@property --md-sweep { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.zone-actionable .fcard, .hand-card.zone-actionable .card-img, .pile.zone-actionable .pile-stack { animation: md-playable 1.3s ease-in-out infinite; }
+@keyframes md-playable {
+  0%, 100% { filter: brightness(1); box-shadow: 0 0 0 3px #fff38a, 0 0 0 5px #ffcf1f, 0 0 12px 6px rgba(255, 196, 30, 0.85), 0 0 28px 12px rgba(255, 160, 0, 0.45); }
+  50% { filter: brightness(1.1); box-shadow: 0 0 0 3px #fffbe0, 0 0 0 6px #ffe04a, 0 0 18px 9px rgba(255, 214, 60, 1), 0 0 40px 18px rgba(255, 180, 0, 0.6); }
+}
+.zone-actionable.act-blue .fcard, .hand-card.zone-actionable.act-blue .card-img { animation: md-playable-blue 1.3s ease-in-out infinite; }
+@keyframes md-playable-blue {
+  0%, 100% { filter: brightness(1); box-shadow: 0 0 0 3px #b5ecff, 0 0 0 5px #2fa8ff, 0 0 12px 6px rgba(40, 150, 255, 0.85), 0 0 28px 12px rgba(20, 110, 255, 0.45); }
+  50% { filter: brightness(1.1); box-shadow: 0 0 0 3px #eafaff, 0 0 0 6px #5cc8ff, 0 0 18px 9px rgba(70, 180, 255, 1), 0 0 40px 18px rgba(30, 130, 255, 0.6); }
+}
+.hand-card.zone-actionable, .zone-actionable .fcard { position: relative; }
+.hand-card.zone-actionable::after, .zone-actionable .fcard::after {
+  content: ""; position: absolute; z-index: 3; pointer-events: none; inset: -4px; border-radius: 6px; padding: 3px;
+  background: conic-gradient(from var(--md-sweep), transparent 0 62%, rgba(255, 255, 255, 0.95) 75%, transparent 88%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: md-sweep 2.2s linear infinite;
+}
+@keyframes md-sweep { to { --md-sweep: 360deg; } }
+
+/* Grille bleue de Master Duel sur notre moitié du terrain quand on a quelque chose à jouer */
+.playable-guide {
+  position: absolute; z-index: 0; pointer-events: none; left: calc(var(--u) * 1.375); top: calc(var(--u) * 28); width: calc(var(--u) * 61.25); height: calc(var(--u) * 25);
+  background: url("./assets/field/guide.webp") center / 100% 100% no-repeat; opacity: 0.6;
+  -webkit-mask: linear-gradient(0deg, #000 35%, transparent), linear-gradient(90deg, transparent, #000 10% 90%, transparent); -webkit-mask-composite: source-in;
+  mask: linear-gradient(0deg, #000 35%, transparent) intersect, linear-gradient(90deg, transparent, #000 10% 90%, transparent);
+  animation: guide-in 0.4s ease-out, guide-breathe 2.6s ease-in-out 0.4s infinite;
+}
+.playable-guide::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(150, 235, 255, 1) 50%, transparent) 0 0 / 18% 100% no-repeat;
+  -webkit-mask: url("./assets/field/guide.webp") center / 100% 100% no-repeat; mask: url("./assets/field/guide.webp") center / 100% 100% no-repeat;
+  animation: guide-scan 2.4s linear infinite;
+}
+@keyframes guide-in { from { opacity: 0; } }
+@keyframes guide-breathe { 50% { opacity: 0.4; } }
+@keyframes guide-scan { from { background-position: -25% 0; } to { background-position: 125% 0; } }
+
+/* Socles du Cimetière et des bannis : image du modèle du jeu (runes bleues / violettes) sur le tapis 2D */
+.pedestal-img { position: absolute; z-index: 0; width: calc(var(--u) * 24); height: calc(var(--u) * 24); pointer-events: none; filter: drop-shadow(0 calc(var(--u) * 0.4) calc(var(--u) * 0.5) rgba(0, 0, 0, 0.55)); }
+.has-3d .pedestal-img { display: none; }
+.duel-board:not(.has-3d) .socket-gy, .duel-board:not(.has-3d) .socket-ban { display: none; }
+
+/* Bulle du nombre de cartes (Deck, Extra, Cimetière, bannis) */
+.pile-count {
+  position: absolute; z-index: 4; top: 30%; width: calc(var(--u) * 4.4); min-width: 34px; aspect-ratio: 154 / 110; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; color: #fff; font: 700 clamp(11px, calc(var(--u) * 1.5), 20px)/1 var(--font-ui);
+  text-shadow: 0 1px 2px #000;
+}
+.pile-count.tail-r { right: 62%; padding: 0 22% 6% 0; background: url("./assets/field/count-r.webp") center / 100% 100% no-repeat; }
+.pile-count.tail-l { left: 62%; padding: 0 0 6% 22%; background: url("./assets/field/count-l.webp") center / 100% 100% no-repeat; }
+.zone-opp .pile-count { top: auto; bottom: 30%; }
+.pile-label { display: none; }
