@@ -276,7 +276,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
 
   return (
     <div className={`duel ${wide ? "duel-wide" : ""} ${wide && !panel ? "duel-nopanel" : ""}`}>
-      {use3d && <Board3DLayer onReady={setReady3d} />}
+      {use3d && <Board3DLayer onReady={setReady3d} myTurn={myTurn} />}
       {panel && (
         <aside className="card-panel">
           {focus ? <CardDetail code={focus} /> : <p className="muted small">Touchez une carte pour afficher ses informations.</p>}
@@ -623,8 +623,8 @@ function LpPlate({ name, lp, max, active, side, thinking }: { name: string; lp: 
 }
 
 const PHASE_LABELS: [number, string][] = [
-  [PHASE.DRAW, "Draw"], [PHASE.STANDBY, "Standby"], [PHASE.MAIN1, "Main1"], [0x8 | 0x10 | 0x20 | 0x40 | 0x80, "Battle"],
-  [PHASE.MAIN2, "Main2"], [PHASE.END, "End"],
+  [PHASE.DRAW, "Draw"], [PHASE.STANDBY, "Standby"], [PHASE.MAIN1, "Main 1"], [0x8 | 0x10 | 0x20 | 0x40 | 0x80, "Battle"],
+  [PHASE.MAIN2, "Main 2"], [PHASE.END, "End"],
 ];
 
 function PhaseOrb({ turn, phase, mine, waiting, buttons, onPick }: {
@@ -645,7 +645,7 @@ function PhaseOrb({ turn, phase, mine, waiting, buttons, onPick }: {
       )}
       <button className={`phase-orb ${mine ? "mine" : "op"} ${ready ? "ready" : ""} ${waiting ? "thinking" : ""}`}
         onClick={() => ready && setOpen(!open)}>
-        <small>Tour {turn}</small>
+        <small>Turn {turn}</small>
         <b>{label}</b>
       </button>
     </div>
