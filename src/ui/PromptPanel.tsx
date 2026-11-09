@@ -4,6 +4,7 @@ import type { OcgMessage, OcgResponse, OcgCardLoc } from "ocgcore-wasm";
 import type { Prompt } from "../engine/controller";
 import { ATTRIBUTES, POS, RACES } from "../lib/constants";
 import { CardImage } from "./CardImage";
+import { ACTION_ICON } from "./mdAssets";
 import { useDb } from "./dbContext";
 import { locationName, sumValid } from "./promptLogic";
 
@@ -156,13 +157,15 @@ function renderBody(m: OcgMessage, respond: (r: OcgResponse) => void, inspect: (
       return <SumSelect m={m} respond={respond} inspect={inspect} />;
     case T.SELECT_POSITION: {
       const options = [POS.FACEUP_ATTACK, POS.FACEDOWN_ATTACK, POS.FACEUP_DEFENSE, POS.FACEDOWN_DEFENSE].filter((p) => m.positions & p);
-      const label = { [POS.FACEUP_ATTACK]: "Attaque", [POS.FACEDOWN_ATTACK]: "Attaque face cachée", [POS.FACEUP_DEFENSE]: "Défense", [POS.FACEDOWN_DEFENSE]: "Défense face cachée" } as Record<number, string>;
+      // Icônes rondes de Master Duel : carte debout (attaque), couchée (défense), dos de carte (face verso).
+      const label = { [POS.FACEUP_ATTACK]: "Position d'attaque face recto", [POS.FACEDOWN_ATTACK]: "Position d'attaque face verso", [POS.FACEUP_DEFENSE]: "Position de défense face recto", [POS.FACEDOWN_DEFENSE]: "Position de défense face verso" } as Record<number, string>;
+      const icon = { [POS.FACEUP_ATTACK]: "atk-up", [POS.FACEDOWN_ATTACK]: "set", [POS.FACEUP_DEFENSE]: "def-up", [POS.FACEDOWN_DEFENSE]: "set" } as Record<number, string>;
       return (
         <div className="position-list">
           {options.map((p) => (
-            <button key={p} onClick={() => respond({ type: R.SELECT_POSITION, position: p })}>
-              <div className={`pos-preview ${p & POS.DEFENSE ? "def" : ""}`}><CardImage code={m.code} back={(p & POS.FACEDOWN) !== 0} /></div>
-              {label[p]}
+            <button key={p} className="md-act" onClick={() => respond({ type: R.SELECT_POSITION, position: p })}>
+              <img src={ACTION_ICON[icon[p]]} alt="" draggable={false} />
+              <span>{label[p]}</span>
             </button>
           ))}
         </div>

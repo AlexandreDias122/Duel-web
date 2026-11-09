@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { OcgMessageType as T, OcgResponseType as R } from "ocgcore-wasm";
 import type { OcgLocation, OcgResponse } from "ocgcore-wasm";
 import { DuelController } from "../engine/controller";
@@ -15,6 +16,7 @@ import { cardActions, placeZones } from "../ui/promptLogic";
 import type { CardAction } from "../ui/promptLogic";
 import { useDb } from "../ui/dbContext";
 import { Board3DLayer } from "../ui/Board3DLayer";
+import { ACTION_ICON, PHASE_ICON } from "../ui/mdAssets";
 import { board3dEnabled, fileToPlaymat, playmatImage, setBoard3dEnabled, setPlaymatImage } from "../ui/board3dPrefs";
 
 interface Props {
@@ -190,13 +192,13 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
   };
 
   // Bouton de phase façon Master Duel
-  const phaseButtons: { label: string; response: OcgResponse }[] = [];
+  const phaseButtons: PhaseButton[] = [];
   if (msg?.type === T.SELECT_IDLECMD) {
-    if (msg.to_bp) phaseButtons.push({ label: "Battle Phase", response: { type: R.SELECT_IDLECMD, action: 6, index: null } });
-    if (msg.to_ep) phaseButtons.push({ label: "Fin du tour", response: { type: R.SELECT_IDLECMD, action: 7, index: null } });
+    if (msg.to_bp) phaseButtons.push({ target: "bp", response: { type: R.SELECT_IDLECMD, action: 6, index: null } });
+    if (msg.to_ep) phaseButtons.push({ target: "ep", response: { type: R.SELECT_IDLECMD, action: 7, index: null } });
   } else if (msg?.type === T.SELECT_BATTLECMD) {
-    if (msg.to_m2) phaseButtons.push({ label: "Main Phase 2", response: { type: R.SELECT_BATTLECMD, action: 2, index: null } });
-    if (msg.to_ep) phaseButtons.push({ label: "Fin du tour", response: { type: R.SELECT_BATTLECMD, action: 3, index: null } });
+    if (msg.to_m2) phaseButtons.push({ target: "mp2", response: { type: R.SELECT_BATTLECMD, action: 2, index: null } });
+    if (msg.to_ep) phaseButtons.push({ target: "ep", response: { type: R.SELECT_BATTLECMD, action: 3, index: null } });
   }
 
   // Cartes en route vers la main : on cache la vraie carte le temps que la carte volante arrive.
@@ -311,6 +313,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
           onPile={onPile}
           zoneFx={zoneFx}
           chainAt={chainAt}
+          guide={phaseButtons.length > 0 || msg?.type === T.SELECT_PLACE || msg?.type === T.SELECT_POSITION}
         />
         {directHit && <div key={directHit.id} className={`direct-hit ${directHit.kind === "attack" && directHit.player === viewer ? "to-op" : "to-me"}`} />}
         {state.chain.length > 0 && (
@@ -401,10 +404,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
             )}
             <div className="action-buttons">
               {menu.actions.map((a, i) => (
-                <button key={i} className={`action-btn act-${actionKind(a.label)}`} onClick={() => respond(a.response)}>
-                  <span className="action-icon">{ACTION_ICONS[actionKind(a.label)]}</span>
-                  <span className="action-label">{a.label}</span>
-                </button>
+                <ActionButton key={i} kind={actionKind(a.label)} label={a.label} onClick={() => respond(a.response)} />
               ))}
             </div>
           </div>
@@ -583,9 +583,20 @@ function MatSheet({ use3d, playmat, on3d, onPlaymat, onClose }: {
   );
 }
 
-const ACTION_ICONS: Record<string, string> = {
-  summon: "⬆", special: "✦", set: "▼", activate: "⚡", position: "⟳", attack: "⚔", other: "•",
+/** Icône ronde du jeu pour chaque type d'action (GUI_T_DuelButtonActIcon*). */
+const ACTION_SPRITE: Record<string, string> = {
+  summon: "summon", special: "special", set: "set", activate: "activate", position: "position", attack: "attack", list: "list", other: "decide",
 };
+
+/** Bouton d'action façon Master Duel : icône ronde, libellé dessous. Jaune pour les effets, bleu pour le reste. */
+function ActionButton({ kind, label, onClick }: { kind: string; label: string; onClick: () => void }) {
+  return (
+    <button className={`md-act act-${kind}`} onClick={onClick}>
+      <img src={ACTION_ICON[ACTION_SPRITE[kind] ?? "decide"]} alt="" draggable={false} />
+      <span>{label}</span>
+    </button>
+  );
+}
 
 function actionKind(label: string): string {
   if (label.startsWith("Invocation Normale")) return "summon";
@@ -627,27 +638,65 @@ const PHASE_LABELS: [number, string][] = [
   [PHASE.MAIN2, "Main 2"], [PHASE.END, "End"],
 ];
 
+type PhaseKey = "dp" | "sp" | "mp1" | "bp" | "mp2" | "ep";
+type PhaseButton = { target: PhaseKey; response: OcgResponse };
+
+/** Les six phases du menu de Master Duel, dans l'ordre. */
+const PHASE_STEPS: { key: PhaseKey; label: string; mask: number }[] = [
+  { key: "dp", label: "Draw", mask: PHASE.DRAW }, { key: "sp", label: "Standby", mask: PHASE.STANDBY },
+  { key: "mp1", label: "Main1", mask: PHASE.MAIN1 }, { key: "bp", label: "Battle", mask: 0x8 | 0x10 | 0x20 | 0x40 | 0x80 },
+  { key: "mp2", label: "Main2", mask: PHASE.MAIN2 }, { key: "ep", label: "End", mask: PHASE.END },
+];
+
 function PhaseOrb({ turn, phase, mine, waiting, buttons, onPick }: {
   turn: number; phase: number; mine: boolean; waiting: boolean;
-  buttons: { label: string; response: OcgResponse }[]; onPick: (r: OcgResponse) => void;
+  buttons: PhaseButton[]; onPick: (r: OcgResponse) => void;
 }) {
   const [open, setOpen] = useState(false);
   const label = PHASE_LABELS.find(([m]) => phase & m)?.[1] ?? "";
   const ready = buttons.length > 0;
   return (
     <div className="phase-wrap">
-      {open && ready && (
-        <div className="phase-menu">
-          {buttons.map((b) => (
-            <button key={b.label} onClick={() => { setOpen(false); onPick(b.response); }}>{b.label}</button>
-          ))}
-        </div>
-      )}
       <button className={`phase-orb ${mine ? "mine" : "op"} ${ready ? "ready" : ""} ${waiting ? "thinking" : ""}`}
-        onClick={() => ready && setOpen(!open)}>
+        onClick={() => ready && setOpen(true)}>
         <small>Turn {turn}</small>
         <b>{label}</b>
       </button>
+      {open && ready && createPortal(
+        <PhaseMenu phase={phase} buttons={buttons} onClose={() => setOpen(false)} onPick={(r) => { setOpen(false); onPick(r); }} />,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+/** « Sélectionnez la phase à laquelle vous souhaitez passer » : les six phases, la phase en cours entourée de jaune. */
+function PhaseMenu({ phase, buttons, onClose, onPick }: {
+  phase: number; buttons: PhaseButton[]; onClose: () => void; onPick: (r: OcgResponse) => void;
+}) {
+  const current = PHASE_STEPS.findIndex((s) => phase & s.mask);
+  return (
+    <div className="sheet-backdrop md-dialog-backdrop phase-menu-backdrop" onClick={onClose}>
+      <div className="md-dialog phase-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="md-dialog-title">Sélectionnez la phase à laquelle vous souhaitez passer</div>
+        <div className="phase-steps" style={{ "--ph-base": `url("${PHASE_ICON.base}")`, "--ph-ring": `url("${PHASE_ICON.ring}")`, "--ph-cursor": `url("${PHASE_ICON.cursor}")` } as React.CSSProperties}>
+          {PHASE_STEPS.map((s, i) => {
+            const btn = buttons.find((b) => b.target === s.key);
+            return (
+              <Fragment key={s.key}>
+                {i > 0 && <i className="phase-dash" />}
+                <button className={`phase-step ${i === current ? "current" : ""} ${btn ? "avail" : ""}`} disabled={!btn} onClick={() => btn && onPick(btn.response)}>
+                  <i className="phase-ico" style={{ "--ico": `url("${PHASE_ICON[s.key]}")` } as React.CSSProperties} />
+                  <span>{s.label}</span>
+                </button>
+              </Fragment>
+            );
+          })}
+        </div>
+        <div className="md-dialog-actions">
+          <button className="md-btn" onClick={onClose}>Annuler</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -829,15 +878,9 @@ function PileMenu({ buttons, onBrowse, onClose }: {
       <div className="action-menu" onClick={(e) => e.stopPropagation()}>
         <div className="action-buttons">
           {buttons.map((b) => (
-            <button key={b.kind} className={`action-btn act-${b.kind}`} onClick={b.onClick}>
-              <span className="action-icon">{ACTION_ICONS[b.kind]}</span>
-              <span className="action-label">{b.label}</span>
-            </button>
+            <ActionButton key={b.kind} kind={b.kind} label={b.label} onClick={b.onClick} />
           ))}
-          <button className="action-btn act-other" onClick={onBrowse}>
-            <span className="action-icon">☰</span>
-            <span className="action-label">Voir les cartes</span>
-          </button>
+          <ActionButton kind="list" label="Voir les cartes" onClick={onBrowse} />
         </div>
       </div>
     </div>

@@ -5,6 +5,11 @@ import { CardImage } from "./CardImage";
 
 import { cardKey } from "./keys";
 import { MAT_HALF_D, MAT_HALF_W } from "./matGeometry";
+import pedestalNear from "../assets/field/pedestal-near.webp";
+import pedestalFar from "../assets/field/pedestal-far.webp";
+
+/** Demi-côté (unités du plateau) des images de socle, rendues vues de dessus depuis le modèle 3D du jeu. */
+const PEDESTAL_HALF = 12;
 
 export interface FieldProps {
   state: DuelState;
@@ -28,6 +33,8 @@ export interface FieldProps {
   zoneFx: Map<string, { cls: string; code: number; id: number }[]>;
   /** Numéro de maillon de chaîne par zone. */
   chainAt: Map<string, number>;
+  /** Grille bleue animée de Master Duel sur notre moitié du terrain (on a quelque chose à jouer). */
+  guide?: boolean;
 }
 
 /**
@@ -76,6 +83,14 @@ export function Field(p: FieldProps) {
   return (
     <div className="mat-wrap">
       <div className="mat">
+        {p.guide && <div className="playable-guide" aria-hidden="true" />}
+        {/* Socles Cimetière + bannis du jeu (tapis 2D ; en 3D ce sont les vrais modèles) */}
+        {([[pedestalNear, SLOT.grave, true], [pedestalFar, SLOT.grave, false]] as const).map(([src, [x, z], mine]) => (
+          <img key={src} className="pedestal-img" src={src} alt="" draggable={false} style={{
+            left: `calc(var(--u) * ${(mine ? x : -x) + MAT_HALF_W - PEDESTAL_HALF})`,
+            top: `calc(var(--u) * ${MAT_HALF_D - (mine ? z : -z) - PEDESTAL_HALF})`,
+          }} />
+        ))}
         <div className="field">{cells}</div>
       </div>
     </div>
@@ -168,7 +183,8 @@ function Pile(p: FieldProps & { player: number; location: number }) {
       <div className={`socket socket-${p.location === LOC.GRAVE ? "gy" : p.location === LOC.REMOVED ? "ban" : p.location === LOC.EXTRA ? "extra" : "deck"}`} />
       {/* Cimetière et bannis : la carte s'engouffre dans le socle, seul le compteur reste (Master Duel). */}
       {count > 0 && !faceUp && <div className="pile-stack pile-thick"><CardImage code={top?.code ?? 0} back={!(top && top.position & POS.FACEUP)} /></div>}
-      <div className="pile-label">{label} <b>{count}</b></div>
+      {/* Bulle du nombre de cartes, la pointe vers la pile (GUI_Duel_PopUpBase) */}
+      <div className={`pile-count ${(p.player === p.viewer) !== (p.location === LOC.EXTRA) ? "tail-r" : "tail-l"}`} title={label}><b>{count}</b></div>
     </div>
   );
 }
