@@ -1045,16 +1045,7 @@ select, input.search, .filters input {
 .pile-deck .pile-stack { rotate: -20deg; }
 .pile-extra .pile-stack { rotate: 20deg; }
 
-/* Bouton de phase et minuteur : anneaux dorés du plateau 3D, le texte se pose dessus */
-.has-3d .phase-orb {
-  width: calc(var(--u) * 6.2); height: calc(var(--u) * 6.2); min-width: 44px; min-height: 44px; clip-path: none; border-radius: 50%;
-  background: none !important; filter: none;
-}
-.has-3d .phase-orb::before { display: none; }
-.has-3d .phase-orb.ready { box-shadow: 0 0 0 2px rgba(255, 220, 120, 0.85), 0 0 18px 4px rgba(255, 200, 80, 0.7); filter: none; }
-.has-3d .phase-orb.ready::after { border-radius: 50%; }
-.has-3d .phase-orb b { font-size: clamp(10px, calc(var(--u) * 1.5), 16px); }
-.has-3d .phase-orb small { font-size: clamp(7px, calc(var(--u) * 0.9), 10px); }
+/* Minuteur : anneau doré du plateau 3D, le texte se pose dessus (le bouton de phase est un médaillon image, voir plus bas) */
 .duel-board .clock { bottom: auto; right: auto; left: calc(50% - var(--u) * 25.65); top: 50%; translate: -50% -50%; }
 .has-3d .clock {
   width: calc(var(--u) * 5); height: calc(var(--u) * 5); min-width: 40px; min-height: 40px; padding: 0;
@@ -1262,23 +1253,21 @@ select, input.search, .filters input {
 }
 .phase-orb.op small, .phase-orb.op b { background-image: linear-gradient(180deg, #ffffff 15%, #ffd0d4 95%); filter: drop-shadow(0 0 1.5px rgba(60, 0, 8, 0.9)) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45)); }
 .phase-orb { line-height: 0.95; }
-/* Tapis 2D : médaillon du jeu (rendu depuis son modèle 3D), rond bleu pendant notre tour, hexagone rouge chez l'adversaire. */
-.duel-board:not(.has-3d) .phase-orb, .duel-board:not(.has-3d) .phase-orb:not(#_) {
+/* Tapis 2D et plateau 3D : même médaillon du jeu (rendu depuis son modèle 3D), rond bleu pendant notre tour, hexagone rouge chez l'adversaire. */
+.duel-board .phase-orb, .duel-board .phase-orb:not(#_) {
   width: calc(var(--u) * 9.4); height: auto; aspect-ratio: 290 / 240; min-width: 64px; clip-path: none; border-radius: 0; border: none;
   padding: 0 0 calc(var(--u) * 1.1); background: url("./assets/phase/coin-mine.webp") center / 100% 100% no-repeat; box-shadow: none; animation: none;
   filter: drop-shadow(0 0 calc(var(--u) * 0.35) rgba(60, 210, 255, 0.95)) drop-shadow(0 0 calc(var(--u) * 0.12) rgba(80, 225, 255, 1)) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(0, 0, 0, 0.55));
 }
-.duel-board:not(.has-3d) .phase-orb.op:not(#_) {
+.duel-board .phase-orb.op:not(#_) {
   background-image: url("./assets/phase/coin-op.webp");
   filter: drop-shadow(0 0 calc(var(--u) * 0.35) rgba(255, 70, 90, 0.85)) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(0, 0, 0, 0.55));
 }
-.duel-board:not(.has-3d) .phase-orb::before, .duel-board:not(.has-3d) .phase-orb::after { display: none; }
-.duel-board:not(.has-3d) .phase-orb.ready:not(#_) { animation: phase-ready 1.1s ease-in-out infinite alternate; }
+.duel-board .phase-orb::before, .duel-board .phase-orb::after { display: none; }
+.duel-board .phase-orb.ready:not(#_) { animation: phase-ready 1.1s ease-in-out infinite alternate; }
 @keyframes phase-ready {
   from { filter: drop-shadow(0 0 calc(var(--u) * 0.35) rgba(60, 210, 255, 0.95)) drop-shadow(0 0 calc(var(--u) * 0.12) rgba(80, 225, 255, 1)) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(0, 0, 0, 0.55)); }
   to { filter: drop-shadow(0 0 calc(var(--u) * 0.9) rgba(120, 235, 255, 1)) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(0, 0, 0, 0.55)); }
 }
-.duel-board:not(.has-3d) .phase-orb b { font-size: clamp(10px, calc(var(--u) * 1.45), 18px); }
-.duel-board:not(.has-3d) .phase-orb small { font-size: clamp(7px, calc(var(--u) * 1), 12px); }
-.has-3d .phase-orb b { font-size: clamp(10px, calc(var(--u) * 1.45), 17px); }
-.has-3d .phase-orb small { font-size: clamp(7px, calc(var(--u) * 1), 12px); }
+.duel-board .phase-orb b { font-size: clamp(10px, calc(var(--u) * 1.45), 18px); }
+.duel-board .phase-orb small { font-size: clamp(7px, calc(var(--u) * 1), 12px); }

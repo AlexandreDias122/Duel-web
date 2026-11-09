@@ -276,7 +276,7 @@ export function DuelScreen({ mode, decks, human, names, turnSeconds, lp = 8000, 
 
   return (
     <div className={`duel ${wide ? "duel-wide" : ""} ${wide && !panel ? "duel-nopanel" : ""}`}>
-      {use3d && <Board3DLayer onReady={setReady3d} myTurn={myTurn} />}
+      {use3d && <Board3DLayer onReady={setReady3d} />}
       {panel && (
         <aside className="card-panel">
           {focus ? <CardDetail code={focus} /> : <p className="muted small">Touchez une carte pour afficher ses informations.</p>}

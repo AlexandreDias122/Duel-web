@@ -1,16 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { Board3D } from "./board3d";
-
 /**
  * Plateau 3D affiché en fond de l'écran de duel, aligné sur le tapis CSS de `.duel-board`.
  * `onReady` signale que la scène est prête, pour rendre le tapis CSS transparent.
  */
-export function Board3DLayer({ onReady, myTurn }: { onReady: (ready: boolean) => void; myTurn: boolean }) {
+export function Board3DLayer({ onReady }: { onReady: (ready: boolean) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const sceneRef = useRef<Board3D | null>(null);
-  const turnRef = useRef(myTurn);
-  turnRef.current = myTurn;
   const [failed, setFailed] = useState(false);
   const readyRef = useRef(onReady);
   readyRef.current = onReady;
@@ -27,8 +22,6 @@ export function Board3DLayer({ onReady, myTurn }: { onReady: (ready: boolean) =>
       .then((s) => {
         if (cancelled) return s.dispose();
         dispose = () => s.dispose();
-        sceneRef.current = s;
-        s.setTurn(turnRef.current);
         readyRef.current(true);
         // La mise en page change avec la taille de l'écran et quand le terrain apparaît : on suit tout.
         ro = new ResizeObserver(() => s.layout());
@@ -44,15 +37,10 @@ export function Board3DLayer({ onReady, myTurn }: { onReady: (ready: boolean) =>
     return () => {
       cancelled = true;
       ro?.disconnect();
-      sceneRef.current = null;
       dispose();
       readyRef.current(false);
     };
   }, []);
-
-  useEffect(() => {
-    sceneRef.current?.setTurn(myTurn);
-  }, [myTurn]);
 
   if (failed) return null;
   return <canvas ref={ref} className="board-3d" aria-hidden="true" />;
