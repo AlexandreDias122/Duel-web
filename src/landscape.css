@@ -1,0 +1,214 @@
+/* ===== Téléphone à l'horizontale (faible hauteur) =====
+   En paysage, un iPhone n'offre que 320 à 430 px de haut : les tailles pensées pour le portrait
+   (titres de 30-40 px, pastilles de 46 px, vignettes de 74 px…) mangeaient tout l'écran.
+   Ce fichier est importé en dernier : il ne s'applique qu'en paysage de faible hauteur,
+   le portrait et l'ordinateur restent inchangés. */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+  body { font-size: 14px; }
+
+  /* ---------- Écrans génériques (decks, duel libre, compte) : l'encoche ne mange plus le bord ---------- */
+  .screen {
+    max-width: 760px;
+    padding: calc(var(--safe-top) + 8px) calc(var(--safe-right) + 16px) calc(var(--safe-bottom) + 14px) calc(var(--safe-left) + 16px);
+  }
+  .screen-head { margin-bottom: 6px; }
+  .screen-head h2 { font-size: 19px; }
+  .field-label { margin: 10px 0 4px; }
+  button { padding: 8px 12px; }
+  .sheet { max-height: 92dvh; max-width: 760px; padding-left: calc(var(--safe-left) + 14px); padding-right: calc(var(--safe-right) + 14px); }
+
+  /* ---------- Accueil : titre et menu compacts, aide et crédits à droite ---------- */
+  .home-content { min-height: 100dvh; padding: calc(var(--safe-top) + 12px) 0 calc(var(--safe-bottom) + 10px) var(--safe-left); max-width: none; }
+  .home-title { font-size: 22px; margin: 0 0 3dvh 18px; }
+  .home-title small { font-size: 12px; }
+  .home-menu { gap: 3px; width: min(46vw, 330px); }
+  .home-item { padding: 3px 34px 3px 12px; }
+  .home-label { font-size: clamp(18px, 6.2dvh, 24px); }
+  .home-sub { font-size: 11px; }
+  .home-arrow { font-size: 26px; right: 14px; }
+  .install-hint, .credits {
+    position: absolute; right: calc(var(--safe-right) + 14px); width: min(40vw, 320px); margin: 0;
+  }
+  .install-hint { bottom: calc(var(--safe-bottom) + 52px); padding: 8px 10px; font-size: 11.5px; }
+  .credits { bottom: calc(var(--safe-bottom) + 10px); padding: 0; font-size: 10px; }
+  .home-hero { top: -10%; right: -8%; width: 70%; }
+
+  /* Écran « DUEL » du lancement */
+  .intro { gap: 6px; }
+  .intro-word { font-size: clamp(72px, 34dvh, 160px); }
+  .intro-sub { font-size: 13px; }
+  .intro-status { bottom: calc(var(--safe-bottom) + 12px); }
+
+  /* ---------- En-tête façon Master Duel (SOLO, Salon) ---------- */
+  .md-head { gap: 10px; padding: calc(var(--safe-top) + 6px) 0 4px; }
+  .md-head h1, .md-head h1:not(#_) { font-size: 22px; }
+  .md-back { width: 34px; height: 34px; }
+  .md-back svg { width: 20px; height: 20px; stroke-width: 3.5; }
+  .md-tab { font-size: 12px; padding: 3px 28px 3px 8px; gap: 6px; }
+  .md-book { width: 22px; height: 16px; }
+
+  .md-pill { padding: 5px 40px; font-size: 14px; }
+  .md-pill.md-select { padding: 5px 16px; }
+  .md-pill.toggle i { font-size: 10px; padding: 1px 7px; right: 10px; }
+  .md-btn { padding: 8px 12px; font-size: 16px; }
+  .md-btn::before { width: 16px; height: 16px; }
+  .md-cta { padding: 8px 28px; font-size: 17px; min-width: min(70%, 300px); clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+
+  /* ---------- SOLO : deux colonnes dès le paysage, éléments resserrés ---------- */
+  .solo { flex-direction: row; height: 100vh; height: 100dvh; overflow: hidden; }
+  .solo-left { width: 50%; padding: 0 14px 0 calc(var(--safe-left) + 14px); display: flex; flex-direction: column; }
+  .solo-right { width: 50%; padding: calc(var(--safe-top) + 10px) calc(var(--safe-right) + 14px) calc(var(--safe-bottom) + 8px) 14px; overflow-y: auto; gap: 8px; }
+  .solo-count { margin: 0 0 6px; font-size: 15px; gap: 10px; }
+  .solo-sort { font-size: 11px; }
+  .solo-sort select { padding: 3px 22px 3px 8px; font-size: 12px; }
+  .md-search { height: 32px; padding: 0 10px; gap: 8px; }
+  .md-search svg { width: 18px; height: 18px; }
+  .md-search input { font-size: 16px; } /* 16 px : Safari ne zoome pas sur le champ */
+  .md-tabs { gap: 5px; margin: 6px 0; }
+  .md-tabs button { font-size: 12px; padding: 5px 2px 6px; gap: 3px; }
+  .md-tabs button small { font-size: 10px; }
+  .solo-list { max-height: none; flex: 1; gap: 6px; padding-bottom: calc(var(--safe-bottom) + 10px); }
+  .solo-item { gap: 10px; padding: 4px; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%); }
+  .solo-thumb { width: 42px; height: 42px; }
+  .solo-name { font-size: 15px; }
+  .solo-stars { font-size: 10px; }
+  .solo-settings { gap: 6px; }
+  .md-note { font-size: 11px; line-height: 1.45; margin: 0 2px; }
+  .md-fields { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .md-field { padding: 5px 10px; font-size: 13px; }
+  .md-field b, .md-field input, .md-field.md-select select { font-size: 16px; }
+  .md-advanced { padding: 6px 10px; }
+  .md-desc { min-height: 0; margin-top: 2px; }
+  .md-desc-body { padding: 8px 12px 10px; }
+  .md-desc-body b { font-size: 13px; }
+  .md-desc-body p { font-size: 13px; }
+  .md-desc-body p.dim, .md-desc-body p.warn { font-size: 11px; }
+  .solo-right .md-cta { bottom: 0; }
+
+  /* ---------- Salon ---------- */
+  .lobby { flex-direction: row; height: 100vh; height: 100dvh; overflow: hidden; }
+  .lobby-left { width: 30%; min-width: 220px; max-width: 300px; padding: 0 12px calc(var(--safe-bottom) + 10px) calc(var(--safe-left) + 12px); display: flex; flex-direction: column; overflow-y: auto; }
+  .lobby-params { flex: 0 0 auto; margin-top: 4px; }
+  .lobby-params dl { grid-template-columns: 1fr; margin: 0 10px; }
+  .lobby-params dl > div { padding: 4px 0; }
+  .lobby-kind { margin: 6px 10px 2px; font-size: 14px; }
+  .lobby-params dt { font-size: 12px; }
+  .lobby-params dd { font-size: 12.5px; }
+  .lobby-deck { margin-top: 8px; gap: 4px; }
+  .lobby-deck > span { font-size: 13px; }
+  .deck-box { width: 130px; padding: 6px 8px; gap: 2px; }
+  .deck-box img { width: 54px; height: 54px; }
+  .deck-box b { font-size: 13px; }
+  .lobby-main { padding: calc(var(--safe-top) + 12px) calc(var(--safe-right) + 18px) calc(var(--safe-bottom) + 10px) 18px; overflow-y: auto; }
+  .lobby-main h2 { font-size: 20px; }
+  .lobby-sub { margin-top: 2px; font-size: 14px; }
+  .lobby-wait { margin: 4px 0 8px; font-size: 12px; line-height: 1.45; }
+  .duelists { gap: 10px; }
+  .duelist { gap: 12px; min-height: 0; padding: 6px 12px; }
+  .duelist.me { box-shadow: 0 0 0 2px var(--lime); border-top-width: 3px; }
+  .duelist.op { border-top-width: 3px; }
+  .duelist-icon { width: 50px; height: 50px; }
+  .duelist-icon.hex { width: 46px; height: 50px; margin: 0 2px; padding: 2px; }
+  .duelist-text { gap: 2px; }
+  .duelist-text b { font-size: 17px; }
+  .duelist-text span { font-size: 13px; }
+  .ready-badge { font-size: 13px; padding: 3px 8px; }
+  .lobby-warn { margin-top: 6px; font-size: 12px; }
+  .lobby-actions { gap: 12px; padding-top: 10px; }
+
+  /* Choix du deck : fenêtre centrée qui utilise toute la hauteur */
+  .md-modal { align-items: center; }
+  .md-sheet { max-height: 94dvh; width: min(620px, 92vw); border-radius: 10px; border-bottom: 1.5px solid rgba(210, 220, 255, 0.4); gap: 8px; padding-bottom: 10px; }
+  .md-sheet > .md-btn { font-size: 15px; padding: 7px; }
+  .picker-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; align-content: start; }
+  .picker-list h3 { grid-column: 1 / -1; margin: 6px 0 4px; font-size: 11px; }
+  .picker-item { margin-bottom: 4px; padding: 3px; gap: 8px; }
+  .picker-art { width: 36px; height: 36px; }
+  .picker-item b { font-size: 13px; }
+
+  /* ---------- Pile ou face : pièce à gauche, résultat et boutons à droite ---------- */
+  .toss { gap: 0; padding: calc(var(--safe-top) + 8px) calc(var(--safe-right) + 16px) calc(var(--safe-bottom) + 8px) calc(var(--safe-left) + 16px); }
+  .toss-title { font-size: clamp(24px, 11dvh, 44px); margin-top: 0; }
+  .toss-stage { width: min(30vw, 30dvh, 150px); margin: 26dvh 0 2dvh; }
+  .toss-stage.landed { width: min(26vw, 22dvh, 110px); margin: 2dvh 0 1dvh; }
+  .toss-word { font-size: clamp(30px, 11dvh, 52px); }
+  .toss-result { gap: 2px; }
+  .toss-result p { font-size: 13px; line-height: 1.4; margin: 2px 0 6px; }
+  .toss-choices { flex-direction: row; gap: 12px; width: min(560px, 80vw); }
+  .toss-choices .md-cta, .toss-choices .md-btn { flex: 1; }
+  .toss-cancel { margin-top: 2px; padding: 4px 8px; }
+  @keyframes toss-lift {
+    0% { transform: translateY(0) scale(1); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+    45% { transform: translateY(-18dvh) scale(0.72); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+    88% { transform: translateY(0) scale(1); }
+    94% { transform: translateY(-2dvh) scale(0.97); }
+    100% { transform: translateY(0) scale(1); }
+  }
+
+  /* ---------- Éditeur de deck : deck à gauche, recherche à droite ---------- */
+  .editor { flex-direction: row; flex-wrap: wrap; max-width: none; padding-left: var(--safe-left); padding-right: var(--safe-right); }
+  .editor-head { width: 100%; padding: 2px 8px; }
+  .deck-name { font-size: 15px; padding: 4px; }
+  .editor-deck { flex: 1 1 55%; max-height: none; height: calc(100dvh - var(--safe-top) - 44px); border-bottom: none; border-right: 1px solid var(--line); }
+  .deck-grid { grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); }
+  .editor-search { flex: 1 1 40%; height: calc(100dvh - var(--safe-top) - 44px); padding: 4px 8px; }
+  .filters { gap: 4px; margin-top: 4px; }
+  .filters input, .filters select { padding: 5px 8px; }
+  .result-grid { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 4px; }
+
+  /* ---------- Duel ---------- */
+  .duel { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+  .tool { width: 30px; height: 30px; font-size: 13px; }
+  .lp-plate { min-width: 112px; gap: 6px; padding: 3px 18px 3px 3px; }
+  .lp-op { padding: 3px 3px 3px 18px; }
+  .avatar { width: 32px; height: 32px; flex-basis: 32px; font-size: 15px; }
+  .lp-value { font-size: 18px; }
+  .pname { font-size: 9px; }
+  .speed-btn { width: 40px; height: 40px; font-size: 13px; }
+  .clock { font-size: 11px; padding: 2px 8px; }
+  .banner { font-size: 11px; padding: 4px 12px; }
+  .turn-hint { font-size: 11px; padding: 3px 10px; }
+  .log { top: calc(var(--safe-top) + 44px); max-height: 70dvh; font-size: 11px; }
+  .bot-chat { font-size: 11px; }
+  .end-overlay h1 { font-size: 40px; }
+
+  /* Fenêtre de choix en bas : moins haute, plus étroite, le terrain reste visible au-dessus */
+  .sheet.prompt { max-width: min(640px, 76vw); max-height: 54dvh; padding: 8px 12px calc(var(--safe-bottom) + 8px); border-radius: 14px 14px 0 0; }
+  .sheet-head { margin-bottom: 6px; }
+  .sheet-head h3, .sheet-head h2 { font-size: 15px; margin: 0; }
+  .sheet-actions { margin-top: 6px; gap: 8px; }
+  .sheet .sheet-actions { padding: 6px 0 calc(var(--safe-bottom) + 2px); }
+  .sheet-actions button { padding: 7px 14px; }
+  .action-list, .choice-list, .option-list { gap: 5px; }
+  .action-list { margin-bottom: 6px; }
+  .option-list { max-height: 34dvh; }
+  .choice { padding: 4px 8px; gap: 8px; min-width: 0; }
+  .sheet.prompt .choice-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .choice span { min-width: 0; }
+  .choice .card-img { width: 32px; flex-basis: 32px; }
+  .yn { gap: 10px; }
+  .yn .card-img { width: 56px; flex-basis: 56px; }
+  .yn-effect { max-height: 64px; }
+  .pick-grid, .sheet .pick-grid { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 6px; }
+  .position-list button { width: 96px; gap: 4px; }
+  .prompt-restore { padding: 6px 14px; font-size: 13px; }
+
+  /* Fenêtres centrales façon Master Duel (choix de cartes, menu de phase) */
+  .md-dialog { max-height: 94dvh; gap: 8px; padding: 10px 12px; width: min(86vw, 780px); }
+  .md-dialog-title { font-size: 15px; }
+  .md-dialog-cards { padding: 8px; gap: 8px; }
+  .md-dialog-card { width: clamp(52px, 24dvh, 96px); }
+  .md-dialog-actions .md-btn, .md-dialog .md-btn { padding: 7px 10px; font-size: 14px; }
+  .phase-steps { padding: 10px 8px; }
+
+  /* Menu d'actions sur une carte : boutons ronds à la taille de l'écran */
+  .action-card { width: clamp(48px, 20dvh, 96px); }
+  .action-buttons { gap: 10px; }
+  .md-act { width: clamp(64px, 18dvh, 92px); font-size: clamp(11px, 3.2dvh, 14px); }
+  .md-act img { width: clamp(40px, 13dvh, 64px); }
+  .position-list .md-act, .position-list .md-act:not(#_) { width: clamp(80px, 24dvh, 120px); font-size: 12px; }
+}
