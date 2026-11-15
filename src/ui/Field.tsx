@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { DuelState, FieldCard } from "../engine/protocol";
 import { LOC, POS, TYPE } from "../lib/constants";
 import { CardImage } from "./CardImage";
@@ -177,13 +177,26 @@ function Pile(p: FieldProps & { player: number; location: number }) {
   const faceUp = p.location === LOC.GRAVE || p.location === LOC.REMOVED;
   const label = { [LOC.GRAVE]: "Cim.", [LOC.REMOVED]: "Bannis", [LOC.EXTRA]: "Extra", [LOC.DECK]: "Deck" }[p.location];
   const actionable = list?.some((_, i) => p.actionable.has(cardKey(p.player, p.location, i)));
+  const isCard = p.location === LOC.EXTRA || p.location === LOC.DECK;
+  // Au doigt (pas de survol) : le compteur et la surbrillance restent un instant après l'appui.
+  const [peek, setPeek] = useState(false);
+  const peekTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(peekTimer.current), []);
+  const onPointerDown = (e: { pointerType: string }) => {
+    if (e.pointerType === "mouse") return;
+    setPeek(true);
+    window.clearTimeout(peekTimer.current);
+    peekTimer.current = window.setTimeout(() => setPeek(false), 1600);
+  };
   return (
-    <div className={`pile pile-${p.location === LOC.DECK ? "deck" : p.location === LOC.EXTRA ? "extra" : p.location === LOC.GRAVE ? "gy" : "ban"} ${actionable ? "zone-actionable" : ""} ${p.player !== p.viewer ? "zone-opp" : ""}`} data-pile={`${p.player}-${p.location}`} onClick={() => p.onPile(p.player, p.location)}>
-      {actionable && <div className={`pile-ring ${p.location === LOC.EXTRA || p.location === LOC.DECK ? "pile-ring-card" : ""}`}><i /><i /></div>}
+    <div className={`pile pile-${p.location === LOC.DECK ? "deck" : p.location === LOC.EXTRA ? "extra" : p.location === LOC.GRAVE ? "gy" : "ban"} ${actionable ? "zone-actionable" : ""} ${p.player !== p.viewer ? "zone-opp" : ""} ${peek ? "pile-peek" : ""}`} data-pile={`${p.player}-${p.location}`} onPointerDown={onPointerDown} onClick={() => p.onPile(p.player, p.location)}>
+      {/* Surbrillance au survol (ou à l'appui sur écran tactile) */}
+      <div className={`pile-hl ${isCard ? "pile-hl-card" : ""}`} />
+      {actionable && <div className={`pile-ring ${isCard ? "pile-ring-card" : ""}`}><i /><i /></div>}
       <div className={`socket socket-${p.location === LOC.GRAVE ? "gy" : p.location === LOC.REMOVED ? "ban" : p.location === LOC.EXTRA ? "extra" : "deck"}`} />
       {/* Cimetière et bannis : la carte s'engouffre dans le socle, seul le compteur reste (Master Duel). */}
       {count > 0 && !faceUp && <div className="pile-stack pile-thick"><CardImage code={top?.code ?? 0} back={!(top && top.position & POS.FACEUP)} /></div>}
-      {/* Bulle du nombre de cartes, la pointe vers la pile (GUI_Duel_PopUpBase) */}
+      {/* Bulle du nombre de cartes, la pointe vers la pile (GUI_Duel_PopUpBase) : visible seulement au survol / à l'appui */}
       <div className={`pile-count ${(p.player === p.viewer) !== (p.location === LOC.EXTRA) ? "tail-r" : "tail-l"}`} title={label}><b>{count}</b></div>
     </div>
   );

@@ -1373,3 +1373,23 @@ select, input.search, .filters input {
 .pile-count.tail-l { left: 62%; padding: 0 0 6% 22%; background: url("./assets/field/count-l.webp") center / 100% 100% no-repeat; }
 .zone-opp .pile-count { top: auto; bottom: 30%; }
 .pile-label { display: none; }
+
+/* Compteurs des piles (Deck, Extra, Cimetière, bannis) : cachés par défaut, ils apparaissent au survol
+   de la pile, qui s'éclaire. Au doigt, un appui les montre un instant (classe pile-peek). */
+.pile-count { opacity: 0; scale: 0.85; transition: opacity 0.15s ease-out, scale 0.15s ease-out; }
+.pile-hl {
+  position: absolute; left: 50%; top: 50%; width: calc(var(--u, 8px) * 7.6); aspect-ratio: 1; translate: -50% -50%; z-index: 0; pointer-events: none;
+  border-radius: 50%; opacity: 0; transition: opacity 0.15s ease-out;
+  box-shadow: 0 0 0 calc(var(--u, 8px) * 0.25) rgba(200, 240, 255, 0.95), 0 0 calc(var(--u, 8px) * 1.6) calc(var(--u, 8px) * 0.45) rgba(90, 190, 255, 0.85), inset 0 0 calc(var(--u, 8px) * 1.4) rgba(140, 215, 255, 0.75);
+  background: radial-gradient(circle, rgba(170, 225, 255, 0.28) 0 55%, transparent 72%);
+}
+.has-3d .pile-gy .pile-hl, .has-3d .pile-ban .pile-hl { width: calc(var(--u) * 6.6); translate: -50% calc(-50% - var(--u) * 0.9); }
+.pile-hl-card { width: calc(var(--cw) * 0.95); aspect-ratio: 1 / 1.46; border-radius: 4px; background: rgba(170, 225, 255, 0.18); z-index: 2; }
+.pile-extra .pile-hl-card { rotate: 20deg; }
+.pile-deck .pile-hl-card { rotate: -20deg; }
+.pile-peek .pile-count, .pile-peek .pile-hl { opacity: 1; scale: 1; }
+.pile-peek .pile-stack { filter: brightness(1.18); }
+@media (hover: hover) {
+  .pile:hover .pile-count, .pile:hover .pile-hl { opacity: 1; scale: 1; }
+  .pile:hover .pile-stack { filter: brightness(1.18); }
+}
